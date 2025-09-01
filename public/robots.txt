@@ -1,0 +1,47 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://2ise-groupe.com/sitemap.xml
+
+# Optimisation pour Google
+User-agent: Googlebot
+Allow: /
+
+# Optimisation pour Bing
+User-agent: Bingbot
+Allow: /
+
+# Bloquer les pages privées et sensibles
+Disallow: /login
+Disallow: /secretary-login
+Disallow: /student-login
+Disallow: /teacher-login
+Disallow: /admin/
+Disallow: /secretary/
+Disallow: /student/
+Disallow: /teacher/
+Disallow: /api/
+Disallow: /private/
+Disallow: /dashboard
+Disallow: /students
+Disallow: /payments
+Disallow: /grades
+Disallow: /parent
+Disallow: /registration
+
+# Bloquer les fichiers sensibles
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /*.css$
+
+# Autoriser les ressources importantes
+Allow: /manifest.json
+Allow: /favicon.ico
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.jpeg
+Allow: /*.gif
+Allow: /*.svg
+Allow: /*.webp

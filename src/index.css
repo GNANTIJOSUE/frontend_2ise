@@ -1,0 +1,98 @@
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+
+/* Styles pour l'impression des rapports de retards de paiement */
+
+@media print {
+    /* Masquer tous les éléments sauf le rapport d'impression */
+    body * {
+        visibility: hidden;
+    }
+    /* Afficher seulement le contenu d'impression */
+    .print-content,
+    .print-content * {
+        visibility: visible;
+    }
+    /* Styles spécifiques pour l'impression */
+    .print-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 20px;
+        background: white;
+        color: black;
+    }
+    /* Assurer que les tableaux s'impriment correctement */
+    table {
+        page-break-inside: auto;
+    }
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+    /* Éviter les coupures de page dans les lignes de tableau */
+    thead {
+        display: table-header-group;
+    }
+    tfoot {
+        display: table-footer-group;
+    }
+    /* Styles pour les couleurs d'impression */
+    .print-content th {
+        background-color: #1976d2 !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    .print-content .overdue-high {
+        background-color: #ffcdd2 !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    .print-content .overdue-medium {
+        background-color: #ffebee !important;
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+    /* Styles spécifiques pour le tableau d'impression */
+    .print-content table {
+        width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+    .print-content th,
+    .print-content td {
+        border: 1px solid #000 !important;
+        padding: 4px 2px !important;
+        font-size: 10px !important;
+        word-wrap: break-word !important;
+        white-space: normal !important;
+    }
+    .print-content th {
+        background-color: #1976d2 !important;
+        color: white !important;
+        font-weight: bold !important;
+        text-align: center !important;
+    }
+    /* Assurer que toutes les colonnes sont visibles */
+    .print-content .MuiTableContainer-root {
+        overflow-x: visible !important;
+        width: 100% !important;
+    }
+    .print-content .MuiTable-root {
+        width: 100% !important;
+        min-width: auto !important;
+    }
+}

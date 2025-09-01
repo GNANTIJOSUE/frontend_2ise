@@ -1,0 +1,55 @@
+{
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "2ISE-GROUPE - Gestion Scolaire",
+    "description": "Application de gestion scolaire complète pour les établissements 2ISE-GROUPE au Côte d'Ivoire. Gestion des inscriptions, paiements, notes et bulletins scolaires.",
+    "url": "https://2ise-groupe.com",
+    "applicationCategory": "EducationApplication",
+    "operatingSystem": "Web Browser, Android, iOS",
+    "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "XAF",
+        "availability": "https://schema.org/InStock"
+    },
+    "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "150",
+        "bestRating": "5",
+        "worstRating": "1"
+    },
+    "author": {
+        "@type": "Organization",
+        "name": "2ISE-GROUPE",
+        "url": "https://2ise-groupe.com",
+        "logo": "https://2ise-groupe.com/android-icon-192x192.png",
+        "address": {
+            "@type": "PostalAddress",
+            "addressCountry": "CM",
+            "addressLocality": "Côte d'Ivoire"
+        }
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "2ISE-GROUPE",
+        "url": "https://2ise-groupe.com"
+    },
+    "keywords": "gestion scolaire, école Côte d'Ivoire, inscription école, paiement scolaire, notes élèves, bulletin scolaire, affectation scolaire, établissement éducatif, administration scolaire, logiciel école, système scolaire",
+    "screenshot": "https://2ise-groupe.com/screenshot-wide.png",
+    "softwareVersion": "1.0.0",
+    "datePublished": "2024-01-15",
+    "dateModified": "2024-01-15",
+    "inLanguage": "fr",
+    "countryOfOrigin": "CM",
+    "featureList": [
+        "Inscription des élèves",
+        "Gestion des paiements",
+        "Saisie des notes",
+        "Génération des bulletins",
+        "Affectation scolaire",
+        "Espace parent",
+        "Tableau de bord administrateur",
+        "Rapports et statistiques"
+    ]
+}

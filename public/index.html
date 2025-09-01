@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no" />
+    <meta name="theme-color" content="#1976d2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="2ISE-GROUPE" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="2ISE-GROUPE" />
+    <meta name="msapplication-TileColor" content="#1976d2" />
+    <meta name="msapplication-TileImage" content="%PUBLIC_URL%/ms-icon-144x144.png" />
+    <meta name="msapplication-config" content="%PUBLIC_URL%/browserconfig.xml" />
+
+    <!-- Icônes pour iOS -->
+    <link rel="apple-touch-icon" sizes="57x57" href="%PUBLIC_URL%/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="%PUBLIC_URL%/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="%PUBLIC_URL%/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="%PUBLIC_URL%/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="%PUBLIC_URL%/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="%PUBLIC_URL%/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="%PUBLIC_URL%/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="%PUBLIC_URL%/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-icon-180x180.png">
+
+    <!-- Icônes pour Android et autres -->
+    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="%PUBLIC_URL%/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/android-icon-192x192.png">
+
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Splash screens pour iOS -->
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-2048-2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-1668-2388.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-1536-2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-1125-2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-1242-2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-750-1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/apple-splash-640-1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+
+    <!-- Meta tags pour SEO et partage social -->
+    <meta name="description" content="2ISE-GROUPE - Application de gestion scolaire #1 au Côte d'Ivoire. Inscription, paiement, notes, bulletins, affectation. Solution complète pour écoles et établissements éducatifs." />
+    <meta name="keywords" content="gestion scolaire, école Côte d'Ivoire, 2ISE-GROUPE, inscription école, paiement scolaire, notes élèves, bulletin scolaire, affectation scolaire, établissement éducatif, administration scolaire, logiciel école, système scolaire"
+    />
+    <meta name="author" content="2ISE-GROUPE" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="google" content="notranslate" />
+    <meta name="geo.region" content="CM" />
+    <meta name="geo.placename" content="Côte d'Ivoire" />
+    <meta name="geo.position" content="3.848033;11.502075" />
+    <meta name="ICBM" content="3.848033, 11.502075" />
+    <link rel="canonical" href="https://2ise-groupe.com" />
+
+    <!-- Open Graph pour Facebook -->
+    <meta property="og:title" content="2ISE-GROUPE - Gestion Scolaire #1 Côte d'Ivoire" />
+    <meta property="og:description" content="Application de gestion scolaire complète pour les établissements 2ISE-GROUPE. Inscription, paiement, notes, bulletins. Solution éducative innovante." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://2ise-groupe.com" />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="2ISE-GROUPE" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="2ISE-GROUPE - Gestion Scolaire #1 Côte d'Ivoire" />
+    <meta name="twitter:description" content="Application de gestion scolaire complète pour les établissements 2ISE-GROUPE. Inscription, paiement, notes, bulletins." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta name="twitter:site" content="@2ISE_GROUPE" />
+    <meta name="twitter:creator" content="@2ISE_GROUPE" />
+
+    <title>2ISE-GROUPE - Gestion Scolaire #1 Côte d'Ivoire | Inscription École | Paiement Scolaire</title>
+
+    <!-- Données structurées JSON-LD pour SEO -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "2ISE-GROUPE - Gestion Scolaire",
+            "description": "Application de gestion scolaire complète pour les établissements 2ISE-GROUPE au Côte d'ivoire. Gestion des inscriptions, paiements, notes et bulletins scolaires.",
+            "url": "https://2ise-groupe.com",
+            "applicationCategory": "EducationApplication",
+            "operatingSystem": "Web Browser, Android, iOS",
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "XAF",
+                "availability": "https://schema.org/InStock"
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.8",
+                "ratingCount": "150",
+                "bestRating": "5",
+                "worstRating": "1"
+            },
+            "author": {
+                "@type": "Organization",
+                "name": "2ISE-GROUPE",
+                "url": "https://2ise-groupe.com",
+                "logo": "https://2ise-groupe.com/android-icon-192x192.png",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressCountry": "CM",
+                    "addressLocality": "Côte d'Ivoire"
+                }
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "2ISE-GROUPE",
+                "url": "https://2ise-groupe.com"
+            },
+            "keywords": "gestion scolaire, école Côte d'Ivoire, inscription école, paiement scolaire, notes élèves, bulletin scolaire, affectation scolaire, établissement éducatif, administration scolaire, logiciel école, système scolaire",
+            "screenshot": "https://2ise-groupe.com/screenshot-wide.png",
+            "softwareVersion": "1.0.0",
+            "datePublished": "2024-01-15",
+            "dateModified": "2024-01-15",
+            "inLanguage": "fr",
+            "countryOfOrigin": "CM",
+            "featureList": [
+                "Inscription des élèves",
+                "Gestion des paiements",
+                "Saisie des notes",
+                "Génération des bulletins",
+                "Affectation scolaire",
+                "Espace parent",
+                "Tableau de bord administrateur",
+                "Rapports et statistiques"
+            ]
+        }
+    </script>
+</head>
+
+<body>
+    <noscript>
+        <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+            <h1>2ISE-GROUPE - Gestion Scolaire</h1>
+            <p>Vous devez activer JavaScript pour utiliser cette application.</p>
+            <p>Please enable JavaScript to run this app.</p>
+        </div>
+    </noscript>
+    <div id="root"></div>
+</body>
+
+</html>

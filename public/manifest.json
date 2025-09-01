@@ -1,0 +1,82 @@
+{
+    "short_name": "2ISE-GROUPE",
+    "name": "2ISE-GROUPE - Gestion Scolaire #1 Côte d'Ivoire",
+    "description": "Application de gestion scolaire complète pour les établissements 2ISE-GROUPE au Côte d'Ivoire. Inscription, paiement, notes, bulletins scolaires.",
+    "id": "com.2ise.gestion-scolaire",
+    "icons": [{
+            "src": "favicon-16x16.png",
+            "sizes": "16x16",
+            "type": "image/png"
+        },
+        {
+            "src": "favicon-32x32.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        },
+        {
+            "src": "android-icon-72x72.png",
+            "sizes": "72x72",
+            "type": "image/png"
+        },
+        {
+            "src": "android-icon-96x96.png",
+            "sizes": "96x96",
+            "type": "image/png"
+        },
+        {
+            "src": "android-icon-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png"
+        },
+        {
+            "src": "android-icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "android-icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "android-icon-192x192.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "android-icon-192x192.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "related_applications": [],
+    "theme_color": "#1976d2",
+    "background_color": "#ffffff",
+    "categories": ["education", "productivity"],
+    "lang": "fr",
+    "dir": "ltr",
+    "prefer_related_applications": false,
+    "related_applications": [],
+    "screenshots": [{
+            "src": "screenshot-wide.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide"
+        },
+        {
+            "src": "screenshot-narrow.png",
+            "sizes": "750x1334",
+            "type": "image/png",
+            "form_factor": "narrow"
+        }
+    ]
+}

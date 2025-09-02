@@ -114,13 +114,30 @@ const History = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogActiveTab, setDialogActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   
-  // Nouveaux états pour la recherche par date
+  // Fonction pour obtenir l'année scolaire courante
+  const getCurrentSchoolYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    // L'année scolaire commence en septembre (mois 9)
+    // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+    // Si on est entre janvier et août, c'est l'année scolaire précédente
+    if (month >= 9) {
+      return `${year}-${year + 1}`;
+    } else {
+      return `${year - 1}-${year}`;
+    }
+  };
+
+  // Nouveaux états pour la recherche par date et année scolaire
   const [searchDate, setSearchDate] = useState<string>('');
+  const [schoolYear, setSchoolYear] = useState<string>(getCurrentSchoolYear());
   const [filteredDailyStats, setFilteredDailyStats] = useState<DailyStats[]>([]);
   const [filteredUserStats, setFilteredUserStats] = useState<UserStats[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -135,7 +152,17 @@ const History = () => {
     'comptable'
   ];
 
-  // Fonction pour filtrer les données par date
+  // Fonction utilitaire pour générer les années scolaires
+  const getSchoolYears = (count = 5) => {
+    const currentSchoolYear = getCurrentSchoolYear();
+    const currentYear = parseInt(currentSchoolYear.split('-')[0]);
+    return Array.from({ length: count }, (_, i) => {
+      const start = currentYear - (count - 1 - i);
+      return `${start}-${start + 1}`;
+    }).reverse();
+  };
+
+  // Fonction pour filtrer les données par date et année scolaire
   const filterDataByDate = (date: string) => {
     if (!date) {
       setFilteredDailyStats(dailyStats);
@@ -196,6 +223,13 @@ const History = () => {
     filterDataByDate(newDate);
   };
 
+  // Gérer le changement d'année scolaire
+  const handleSchoolYearChange = (event: any) => {
+    const newYear = event.target.value as string;
+    setSchoolYear(newYear);
+    // Les données seront rechargées automatiquement via useEffect
+  };
+
   // Effacer la recherche
   const clearSearch = () => {
     setSearchDate('');
@@ -239,7 +273,7 @@ const History = () => {
     if (users.length > 0) {
       loadAllStats();
     }
-  }, [users]);
+  }, [users, schoolYear]); // Ajouter schoolYear comme dépendance
 
   // Ajouter un useEffect pour mettre à jour les données filtrées quand les données changent
   useEffect(() => {
@@ -429,8 +463,8 @@ const History = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [paymentsResponse, enrollmentsResponse] = await Promise.all([
-        axios.get('https://2ise-groupe.com/api/payments/all', { headers }),
-        axios.get('https://2ise-groupe.com/api/students/enrollments/all', { headers })
+        axios.get(`https://2ise-groupe.com/api/payments/all?school_year=${schoolYear}`, { headers }),
+        axios.get(`https://2ise-groupe.com/api/students/enrollments/all?school_year=${schoolYear}`, { headers })
       ]);
 
       const allPayments = paymentsResponse.data || [];
@@ -554,13 +588,29 @@ const History = () => {
               </Typography>
             </Box>
 
-            {/* Ajouter la section de recherche par date */}
+            {/* Ajouter la section de recherche par date et année scolaire */}
             <Paper sx={{ p: 3, borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
                 <Typography variant="h6" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <SearchIcon />
-                  Recherche par Date
+                  Filtres de Recherche
                 </Typography>
+                
+                {/* Sélecteur d'année scolaire */}
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Année scolaire</InputLabel>
+                  <Select
+                    value={schoolYear}
+                    onChange={handleSchoolYearChange}
+                    label="Année scolaire"
+                  >
+                    {getSchoolYears(5).map((year) => (
+                      <MenuItem key={year} value={year}>{year}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {/* Recherche par date */}
                 <TextField
                   type="date"
                   label="Sélectionner une date"
@@ -577,9 +627,9 @@ const History = () => {
                 >
                   Effacer
                 </Button>
-                {searchDate && (
+                {(searchDate || schoolYear !== getCurrentSchoolYear()) && (
                   <Chip
-                    label={`Résultats pour le ${new Date(searchDate).toLocaleDateString('fr-FR')}`}
+                    label={`Filtres actifs: ${schoolYear}${searchDate ? ` - ${new Date(searchDate).toLocaleDateString('fr-FR')}` : ''}`}
                     color="primary"
                     variant="outlined"
                   />
@@ -1061,7 +1111,7 @@ const History = () => {
             <Alert severity="error">{detailsError}</Alert>
           ) : (
             <Box>
-              <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 2 }}>
+              <Tabs value={dialogActiveTab} onChange={(e, newValue) => setDialogActiveTab(newValue)} sx={{ mb: 2 }}>
                 <Tab label={`Paiements (${userDetails.payments.length})`} />
                 <Tab label={`Inscriptions (${userDetails.enrollments.length})`} />
               </Tabs>
@@ -1072,7 +1122,7 @@ const History = () => {
                 </Alert>
               )}
               
-              {activeTab === 0 && (
+              {dialogActiveTab === 0 && (
                 <>
                   {userDetails.payments.length === 0 ? (
                     <Alert severity="info">
@@ -1154,7 +1204,7 @@ const History = () => {
                 </>
               )}
               
-              {activeTab === 1 && (
+              {dialogActiveTab === 1 && (
                 <>
                   {userDetails.enrollments.length === 0 ? (
                     <Alert severity="info">

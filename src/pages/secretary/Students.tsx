@@ -207,8 +207,23 @@ const Students = () => {
   // Ajout pour message d'erreur API réinscription
   const [reinscriptionApiError, setReinscriptionApiError] = useState<string | null>(null);
 
+  // Fonction pour obtenir l'année scolaire courante
+  const getCurrentSchoolYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    // L'année scolaire commence en septembre (mois 9)
+    // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+    // Si on est entre janvier et août, c'est l'année scolaire précédente
+    if (month >= 9) {
+      return `${year}-${year + 1}`;
+    } else {
+      return `${year - 1}-${year}`;
+    }
+  };
+
   // Année scolaire
-  const [schoolYear, setSchoolYear] = useState('2024-2025');
+  const [schoolYear, setSchoolYear] = useState(getCurrentSchoolYear());
   const [availableYears, setAvailableYears] = useState<string[]>([]);
 
   // Ajout pour le niveau suivant et admission
@@ -217,31 +232,15 @@ const Students = () => {
   const [nextLevel, setNextLevel] = useState<string>("");
   const [targetLevel, setTargetLevel] = useState<string>("");
 
-  // Utilitaire pour obtenir l'année scolaire courante
-  function getCurrentSchoolYear() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    if (month >= 9) {
-      return `${year}-${year + 1}`;
-    } else {
-      return `${year - 1}-${year}`;
-    }
-  }
+
   // Ajout des useState manquants pour la gestion du reliquat année précédente (dans le composant)
   const [previousYearDue, setPreviousYearDue] = useState(0);
   const [previousYearPayment, setPreviousYearPayment] = useState('');
   // Fonction utilitaire pour obtenir l'année scolaire précédente
   function getPreviousSchoolYear() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    let previousSchoolYear = '';
-    if (month >= 9) {
-      previousSchoolYear = `${year - 1}-${year}`;
-    } else {
-      previousSchoolYear = `${year - 2}-${year - 1}`;
-    }
+    const currentSchoolYear = getCurrentSchoolYear();
+    const currentYear = parseInt(currentSchoolYear.split('-')[0]);
+    const previousSchoolYear = `${currentYear - 1}-${currentYear}`;
     console.log('[REINSCRIPTION] Année scolaire précédente calculée:', previousSchoolYear);
     return previousSchoolYear;
   }
@@ -633,8 +632,8 @@ const Students = () => {
 
   // Ajoute la fonction utilitaire pour générer les 5 dernières années scolaires
   function getSchoolYears(count = 5) {
-    const now = new Date();
-    const currentYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+    const currentSchoolYear = getCurrentSchoolYear();
+    const currentYear = parseInt(currentSchoolYear.split('-')[0]);
     return Array.from({ length: count }, (_, i) => {
       const start = currentYear - (count - 1 - i);
       return `${start}-${start + 1}`;

@@ -129,15 +129,7 @@ interface DonorReceipt {
     receiptNumber: string;
 }
 
-// Fonction utilitaire pour générer les années scolaires
-function getSchoolYears(count = 5) {
-  const now = new Date();
-  const currentYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return Array.from({ length: count }, (_, i) => {
-    const start = currentYear - (count - 1 - i);
-    return `${start}-${start + 1}`;
-  }).reverse();
-}
+
 
 const Discounts: React.FC = () => {
     const theme = useTheme();
@@ -189,7 +181,33 @@ const Discounts: React.FC = () => {
 
     const receiptRef = useRef(null);
 
-    const [schoolYear, setSchoolYear] = useState('2024-2025');
+    // Fonction pour obtenir l'année scolaire courante
+    const getCurrentSchoolYear = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        // L'année scolaire commence en septembre (mois 9)
+        // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+        // Si on est entre janvier et août, c'est l'année scolaire précédente
+        if (month >= 9) {
+            return `${year}-${year + 1}`;
+        } else {
+            return `${year - 1}-${year}`;
+        }
+    };
+
+    const [schoolYear, setSchoolYear] = useState(getCurrentSchoolYear());
+    
+    // Fonction utilitaire pour générer les années scolaires
+    const getSchoolYears = (count = 5) => {
+        const currentSchoolYear = getCurrentSchoolYear();
+        const currentYear = parseInt(currentSchoolYear.split('-')[0]);
+        return Array.from({ length: count }, (_, i) => {
+            const start = currentYear - (count - 1 - i);
+            return `${start}-${start + 1}`;
+        }).reverse();
+    };
+    
     const [availableYears, setAvailableYears] = useState<string[]>(getSchoolYears(5));
 
     // Fonction unifiée pour charger les données

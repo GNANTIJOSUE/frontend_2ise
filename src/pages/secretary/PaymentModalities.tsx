@@ -157,8 +157,23 @@ const PaymentModalities = () => {
   const [currentReportScope, setCurrentReportScope] = useState<'class' | 'level' | 'school' | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Nouvelle variable pour l'année scolaire - Défaut sur 2024-2025 où il y a plus de retards
-  const [currentSchoolYear, setCurrentSchoolYear] = useState<string>('2024-2025');
+  // Fonction pour obtenir l'année scolaire courante
+  const getCurrentSchoolYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    // L'année scolaire commence en septembre (mois 9)
+    // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+    // Si on est entre janvier et août, c'est l'année scolaire précédente
+    if (month >= 9) {
+      return `${year}-${year + 1}`;
+    } else {
+      return `${year - 1}-${year}`;
+    }
+  };
+
+  // Année scolaire - Défaut sur l'année scolaire courante
+  const [currentSchoolYear, setCurrentSchoolYear] = useState<string>(getCurrentSchoolYear());
 
   const navigate = useNavigate();
 
@@ -913,9 +928,15 @@ const PaymentModalities = () => {
                       }
                     }}
                   >
-                    <MenuItem value="2024-2025">2024-2025</MenuItem>
-                    <MenuItem value="2025-2026">2025-2026</MenuItem>
-                    <MenuItem value="2026-2027">2026-2027</MenuItem>
+                    {(() => {
+                      // Générer les 5 dernières années scolaires en utilisant la même logique
+                      const currentYear = parseInt(currentSchoolYear.split('-')[0]);
+                      return Array.from({ length: 5 }, (_, i) => {
+                        const startYear = currentYear - i;
+                        const label = `${startYear}-${startYear + 1}`;
+                        return <MenuItem key={label} value={label}>{label}</MenuItem>;
+                      });
+                    })()}
                   </TextField>
                 </Box>
                 

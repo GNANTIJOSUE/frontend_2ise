@@ -60,12 +60,22 @@ const Classes = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editClass, setEditClass] = useState<any | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' | 'warning' });
-  const [schoolYear, setSchoolYear] = useState(() => {
+  // Fonction pour obtenir l'année scolaire courante
+  const getCurrentSchoolYear = () => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
-    return month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-  });
+    // L'année scolaire commence en septembre (mois 9)
+    // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+    // Si on est entre janvier et août, c'est l'année scolaire précédente
+    if (month >= 9) {
+      return `${year}-${year + 1}`;
+    } else {
+      return `${year - 1}-${year}`;
+    }
+  };
+
+  const [schoolYear, setSchoolYear] = useState(getCurrentSchoolYear());
   const [classTeachers, setClassTeachers] = useState<any[]>([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
@@ -425,12 +435,15 @@ const Classes = () => {
             <Typography variant="h6">Année scolaire :</Typography>
             <FormControl size="small">
               <Select value={schoolYear} onChange={e => setSchoolYear(e.target.value)}>
-                {Array.from({ length: 5 }).map((_, i) => {
-                  const now = new Date();
-                  const y = now.getFullYear() - i;
-                  const label = `${y - 1}-${y}`;
-                  return <MenuItem key={label} value={label}>{label}</MenuItem>;
-                })}
+                {(() => {
+                  // Générer les 5 dernières années scolaires en utilisant la même logique
+                  const currentYear = parseInt(schoolYear.split('-')[0]);
+                  return Array.from({ length: 5 }, (_, i) => {
+                    const startYear = currentYear - i;
+                    const label = `${startYear}-${startYear + 1}`;
+                    return <MenuItem key={label} value={label}>{label}</MenuItem>;
+                  });
+                })()}
               </Select>
             </FormControl>
           </Box>

@@ -31,6 +31,7 @@ import {
   Visibility as ViewIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
+import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import axios from 'axios';
 import SecretarySidebar from '../../components/SecretarySidebar';
 
@@ -49,12 +50,38 @@ interface CheckPayment {
 }
 
 const CheckManagement = () => {
+  // Fonction pour obtenir l'année scolaire courante
+  const getCurrentSchoolYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    // L'année scolaire commence en septembre (mois 9)
+    // Si on est entre septembre et décembre, c'est l'année scolaire en cours
+    // Si on est entre janvier et août, c'est l'année scolaire précédente
+    if (month >= 9) {
+      return `${year}-${year + 1}`;
+    } else {
+      return `${year - 1}-${year}`;
+    }
+  };
+
+  // Fonction utilitaire pour générer les années scolaires
+  const getSchoolYears = (count = 5) => {
+    const currentSchoolYear = getCurrentSchoolYear();
+    const currentYear = parseInt(currentSchoolYear.split('-')[0]);
+    return Array.from({ length: count }, (_, i) => {
+      const start = currentYear - (count - 1 - i);
+      return `${start}-${start + 1}`;
+    }).reverse();
+  };
+
   const [checks, setChecks] = useState<CheckPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCheck, setSelectedCheck] = useState<CheckPayment | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'view'>('view');
   const [notes, setNotes] = useState('');
+  const [schoolYear, setSchoolYear] = useState<string>(getCurrentSchoolYear());
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -63,13 +90,13 @@ const CheckManagement = () => {
 
   useEffect(() => {
     fetchChecks();
-  }, []);
+  }, [schoolYear]); // Ajouter schoolYear comme dépendance
 
   const fetchChecks = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('https://2ise-groupe.com/api/payments/checks', {
+      const response = await axios.get(`https://2ise-groupe.com/api/payments/checks?school_year=${schoolYear}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setChecks(response.data);
@@ -90,6 +117,13 @@ const CheckManagement = () => {
     setActionType(type);
     setNotes('');
     setDialogOpen(true);
+  };
+
+  // Gérer le changement d'année scolaire
+  const handleSchoolYearChange = (event: any) => {
+    const newYear = event.target.value as string;
+    setSchoolYear(newYear);
+    // Les données seront rechargées automatiquement via useEffect
   };
 
   const handleSubmitAction = async () => {
@@ -178,14 +212,41 @@ const CheckManagement = () => {
           <Typography variant="h4" component="h1" gutterBottom>
             Gestion des chèques et virements
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchChecks}
-          >
-            Actualiser
-          </Button>
+          <Box display="flex" alignItems="center" gap={2}>
+            {/* Sélecteur d'année scolaire */}
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Année scolaire</InputLabel>
+              <Select
+                value={schoolYear}
+                onChange={handleSchoolYearChange}
+                label="Année scolaire"
+              >
+                {getSchoolYears(5).map((year) => (
+                  <MenuItem key={year} value={year}>{year}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={fetchChecks}
+            >
+              Actualiser
+            </Button>
+          </Box>
         </Box>
+
+      {/* Indicateur d'année scolaire */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography variant="h6" color="primary">
+          Année scolaire : {schoolYear}
+        </Typography>
+        <Chip 
+          label={`${checks.length} paiements trouvés`}
+          color="primary"
+          variant="outlined"
+        />
+      </Box>
 
       {/* Statistiques */}
       <Grid container spacing={3} mb={3}>

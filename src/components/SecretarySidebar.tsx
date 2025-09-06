@@ -29,7 +29,8 @@ import {
   LocalOffer as LocalOfferIcon,
   History as HistoryIcon,
   CalendarMonth as CalendarMonthIcon,
-  Receipt as ReceiptIcon
+  Receipt as ReceiptIcon,
+  TableChart as TableChartIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermissions } from '../hooks/usePermissions';
@@ -156,6 +157,12 @@ const SecretarySidebar = () => {
       icon: <HistoryIcon />, 
       path: '/secretary/history',
       permission: 'canViewHistory'
+    },
+    { 
+      text: 'Fichier Excel', 
+      icon: <TableChartIcon />, 
+      path: '/secretary/excel-files',
+      permission: 'canManageExcelFiles'
     },
   ];
 

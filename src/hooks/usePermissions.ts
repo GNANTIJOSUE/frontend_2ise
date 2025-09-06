@@ -32,6 +32,7 @@ export interface Permission {
   canDeleteStudents: boolean;
   canDeleteTeachers: boolean;
   canViewHistory: boolean;
+  canManageExcelFiles: boolean;
 }
 
 export const usePermissions = () => {
@@ -60,6 +61,7 @@ export const usePermissions = () => {
     canDeleteStudents: false,
     canDeleteTeachers: false,
     canViewHistory: false,
+    canManageExcelFiles: false,
   });
 
   useEffect(() => {
@@ -98,6 +100,7 @@ export const usePermissions = () => {
           canDeleteStudents: ['admin', 'directeur_general'].includes(role),
           canDeleteTeachers: ['directeur_etudes', 'admin', 'directeur_general'].includes(role),
           canViewHistory: ['comptable', 'directeur_general', 'admin'].includes(role), // Seul le directeur général peut voir l'historique
+          canManageExcelFiles: ['admin', 'directeur_general'].includes(role), // Seuls l'admin et le directeur général peuvent gérer les fichiers Excel
         };
         
         setPermissions(newPermissions);

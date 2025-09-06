@@ -52,6 +52,7 @@ import SchoolYears from './pages/secretary/SchoolYears';
 import SchoolYearsManagement from './pages/secretary/SchoolYearsManagement';
 import History from './pages/secretary/History';
 import PaymentModalities from './pages/secretary/PaymentModalities';
+import ExcelFiles from './pages/secretary/ExcelFiles';
 import DOMErrorTest from './components/DOMErrorTest';
 import TestInscriptionStatus from './pages/TestInscriptionStatus';
 import { initDOMErrorPrevention } from './utils/domUtils';
@@ -179,7 +180,8 @@ function AppContent() {
         <Route path="/secretary/school-years-management" element={<SchoolYearsManagement />} />
         <Route path="/secretary/inscription-control" element={<InscriptionControl />} />
         <Route path="/secretary/history" element={<History />} />
-<Route path="/secretary/payment-modalities" element={<PaymentModalities />} />
+        <Route path="/secretary/payment-modalities" element={<PaymentModalities />} />
+        <Route path="/secretary/excel-files" element={<ExcelFiles />} />
         <Route path="/test-dom-errors" element={<DOMErrorTest />} />
         <Route path="/test-inscription-status" element={<TestInscriptionStatus />} />
         <Route path="/teacher/dashboard" element={<TeacherDashboard />} />

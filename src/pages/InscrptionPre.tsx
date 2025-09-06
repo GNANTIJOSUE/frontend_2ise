@@ -105,6 +105,7 @@ const Receipt = ({ data, onClose, receiptRef, getRoleLabel }: {
   getRoleLabel: (role: string) => string,
 }) => {
   const isCheckPayment = data.payment_method === 'check';
+  // Pour le reste à payer, on utilise la scolarité totale (data.total_due) moins le montant versé
   const remaining = isCheckPayment ? (data.total_due || 0) : (data.total_due || 0) - (data.payment_amount || 0);
 
   const handlePrint = () => {
@@ -505,14 +506,15 @@ const Receipt = ({ data, onClose, receiptRef, getRoleLabel }: {
         justifyContent: 'center',
         background: '#f5f7fa',
         py: 4,
+        px: 2,
       }}
     >
       <Paper
         ref={receiptRef}
         sx={{
           p: { xs: 3, sm: 6 },
-          borderRadius: 3,
-          boxShadow: 8,
+          borderRadius: 2,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
           maxWidth: 800,
           width: '100%',
           mx: 'auto',
@@ -520,244 +522,845 @@ const Receipt = ({ data, onClose, receiptRef, getRoleLabel }: {
           mb: 3,
           position: 'relative',
           overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '4px',
-            background: 'linear-gradient(90deg, #1976d2, #42a5f5, #1976d2)',
-          }
         }}
       >
-        {/* Header avec logo et titre */}
-        <div className="header">
-          <div className="logo-section">
-            <div className="logo-circle">
-              <img src="/2ISE.jpg" alt="Logo École Excellence" style={{ width: '30%', height: '30%', objectFit: 'cover', borderRadius: '10%' }} />
-            </div>
-            <div className="school-info">
-              <h6>2ISE-GROUPE</h6>
-              <p>Inscription en présentiel</p>
-            </div>
-          </div>
-          <div className="title-section">
-            <h4>Reçu d'inscription</h4>
-            <small>{data.date}</small>
-          </div>
-        </div>
-
-        {/* Informations de l'élève en colonnes */}
-        <div className="section">
-          <div className="section-title">📋 Informations de l'élève</div>
+        {/* Header centré avec logo et titre */}
+        <Box sx={{
+          textAlign: 'center',
+          padding: '16px 0',
+          borderBottom: '1px solid #1976d2',
+          marginBottom: '16px',
+        }}>
+          {/* Logo centré */}
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            mb: 1
+          }}>
+            <Box sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: '#1976d2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)',
+            }}>
+              <img 
+                src="/2ISE.jpg" 
+                alt="Logo École Excellence" 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover', 
+                  borderRadius: '50%'
+                }} 
+              />
+            </Box>
+          </Box>
           
-          <div className="info-grid">
+          {/* Titre principal */}
+          <Typography variant="h5" sx={{
+            fontWeight: 700,
+            color: '#1976d2',
+            mb: 0.5,
+            fontSize: '1.3rem',
+            textTransform: 'uppercase'
+          }}>
+            ÉTABLISSEMENT SCOLAIRE
+          </Typography>
+          
+          {/* Sous-titre */}
+          <Typography variant="h6" sx={{
+            fontWeight: 600,
+            color: '#1976d2',
+            mb: 1,
+            fontSize: '1.1rem'
+          }}>
+            REÇU D'INSCRIPTION
+          </Typography>
+          
+          {/* Numéro et date */}
+          <Typography variant="body2" sx={{
+            color: '#666',
+            fontWeight: 500,
+            fontSize: '0.9rem'
+          }}>
+            {data.student_code} - {data.date}
+          </Typography>
+        </Box>
+
+        {/* Ligne de séparation */}
+        <Divider sx={{ my: 3, borderColor: '#1976d2', borderWidth: 1 }} />
+        
+        {/* Informations de l'élève */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body1" sx={{
+            fontWeight: 700,
+            color: '#1976d2',
+            mb: 2,
+            fontSize: '1rem',
+            textTransform: 'uppercase',
+            borderLeft: '3px solid #1976d2',
+            pl: 1.5
+          }}>
+            INFORMATIONS DE L'ÉLÈVE
+          </Typography>
+          
+          <Grid container spacing={2}>
             {/* Colonne gauche - Informations principales */}
-            <div className="info-box">
-              <h6>Informations personnelles</h6>
-              <div className="info-row">
-                <span className="info-label">Nom & Prénoms:</span>
-                <span className="info-value">{data.last_name} {data.first_name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Matricule:</span>
-                <span className="info-value">{data.registration_number || 'N/A'}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Code Élève:</span>
-                <span className="chip chip-primary">{data.student_code}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Classe:</span>
-                <span className="info-value">{data.desiredClassName}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Statut:</span>
-                {data.is_assigned ? (
-                  <span className="chip chip-success">Affecté</span>
-                ) : (
-                  <span className="chip chip-warning">Non affecté</span>
-                )}
-              </div>
-            </div>
+            <Grid item xs={12} md={6}>
+              <Box sx={{
+                p: 2,
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '12px',
+                border: '1px solid rgba(102, 126, 234, 0.1)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+                height: '100%',
+                position: 'relative',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                  borderTopLeftRadius: '12px',
+                  borderTopRightRadius: '12px',
+                }
+              }}>
+                <Typography variant="body2" sx={{
+                  fontWeight: 700,
+                  color: '#667eea',
+                  mb: 2,
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Informations personnelles
+                </Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Nom & Prénoms:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.last_name} {data.first_name}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Matricule:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.registration_number || 'N/A'}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Code Élève:</Typography>
+                    <Chip 
+                      label={data.student_code} 
+                      sx={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                        height: '20px'
+                      }}
+                    />
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Classe:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.desiredClassName}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Statut:</Typography>
+                    <Chip 
+                      label={data.is_assigned ? 'Affecté' : 'Non affecté'}
+                      sx={{
+                        background: data.is_assigned ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                        height: '20px'
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+            </Grid>
 
             {/* Colonne droite - Informations parent */}
-            <div className="info-box">
-              <h6>Informations parent</h6>
-              <div className="info-row">
-                <span className="info-label">Parent:</span>
-                <span className="info-value">{data.parent_first_name} {data.parent_last_name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Code Parent:</span>
-                <span className="chip chip-secondary">{data.parent_code}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Contact:</span>
-                <span className="info-value">{data.parent_phone}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Date d'inscription:</span>
-                <span className="info-value">{data.date}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+            <Grid item xs={12} md={6}>
+              <Box sx={{
+                p: 2,
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '12px',
+                border: '1px solid rgba(118, 75, 162, 0.1)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+                height: '100%',
+                position: 'relative',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #764ba2, #f093fb)',
+                  borderTopLeftRadius: '12px',
+                  borderTopRightRadius: '12px',
+                }
+              }}>
+                <Typography variant="body2" sx={{
+                  fontWeight: 700,
+                  color: '#764ba2',
+                  mb: 2,
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Informations parent
+                </Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(118, 75, 162, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Parent:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.parent_first_name} {data.parent_last_name}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(118, 75, 162, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Code Parent:</Typography>
+                    <Chip 
+                      label={data.parent_code} 
+                      sx={{
+                        background: 'linear-gradient(135deg, #764ba2 0%, #f093fb 100%)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                        height: '20px'
+                      }}
+                    />
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(118, 75, 162, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Contact:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.parent_phone}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, background: 'rgba(118, 75, 162, 0.05)', borderRadius: '6px' }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>Date d'inscription:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.8rem' }}>{data.date}</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
         
         {/* Détails du paiement */}
-        <div className="section">
-          <div className="section-title">💰 Détails du Paiement</div>
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            mb: 2,
+            p: 1.5,
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+            borderRadius: '8px',
+            border: '1px solid rgba(16, 185, 129, 0.2)'
+          }}>
+            <Box sx={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '0.9rem',
+              fontWeight: 'bold'
+            }}>
+              💰
+            </Box>
+            <Typography variant="h6" sx={{
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontSize: '1.1rem'
+            }}>
+              Détails du Paiement
+            </Typography>
+          </Box>
           
-          <div className="info-box">
-            <div className="payment-grid">
-              <div>
-                <div className="payment-row">
-                  <span className="payment-label">Montant total:</span>
-                  <span className="payment-value" style={{ fontSize: '1.1rem' }}>
-                    {Number(data.total_due || 0).toLocaleString('fr-FR')} F CFA
-                  </span>
-                </div>
-                
-                {!isCheckPayment && (
-                  <div className="payment-row">
-                    <span className="payment-label">Montant versé:</span>
-                    <span className="payment-value success">
-                      {Number(data.payment_amount).toLocaleString('fr-FR')} F CFA
-                    </span>
-                  </div>
-                )}
-                
-                <div className="payment-row">
-                  <span className="payment-label">Moyen de paiement:</span>
-                  <span className={`chip ${data.payment_method === 'check' ? 'chip-warning' : data.payment_method === 'transfer' ? 'chip-info' : 'chip-primary'}`}>
-                    {data.payment_method === 'cash' ? 'Espèces' : 
-                     data.payment_method === 'check' ? 'Chèque' : 
-                     data.payment_method === 'transfer' ? 'Virement' :
-                     data.payment_method || 'Non spécifié'}
-                  </span>
-                </div>
-              </div>
+          <Box sx={{
+            p: 2.5,
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '12px',
+            border: '1px solid rgba(16, 185, 129, 0.1)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            position: 'relative',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              background: 'linear-gradient(90deg, #10b981, #059669)',
+              borderTopLeftRadius: '12px',
+              borderTopRightRadius: '12px',
+            }
+          }}>
+            <Grid container spacing={2}>
+              {/* Colonne gauche - Montants principaux */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Box sx={{
+                    p: 1.5,
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%)',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(102, 126, 234, 0.2)'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#667eea', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                      Scolarité totale
+                    </Typography>
+                    <Typography variant="body2" sx={{
+                      fontWeight: 700,
+                      color: '#667eea',
+                      textAlign: 'center',
+                      fontSize: '1rem'
+                    }}>
+                      {Number(data.total_due || 0).toLocaleString('fr-FR')} F CFA
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{
+                    p: 1.5,
+                    background: 'linear-gradient(135deg, rgba(118, 75, 162, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(118, 75, 162, 0.2)'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#764ba2', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                      Frais d'inscription
+                    </Typography>
+                    <Typography variant="body2" sx={{
+                      fontWeight: 700,
+                      color: '#764ba2',
+                      textAlign: 'center',
+                      fontSize: '1rem'
+                    }}>
+                      {Number(data.frais_inscription || 0).toLocaleString('fr-FR')} F CFA
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{
+                    p: 1.5,
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(245, 158, 11, 0.2)'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                      Moyen de paiement
+                    </Typography>
+                    <Chip 
+                      label={data.payment_method === 'cash' ? 'Espèces' : 
+                             data.payment_method === 'check' ? 'Chèque' : 
+                             data.payment_method === 'transfer' ? 'Virement' :
+                             data.payment_method || 'Non spécifié'}
+                      sx={{
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                        padding: '4px 8px',
+                        height: 'auto',
+                        '& .MuiChip-label': {
+                          padding: '2px 6px',
+                        }
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Grid>
               
-              <div>
-                {data.payment_method === 'check' && (
-                  <>
-                    <div className="payment-row">
-                      <span className="payment-label">Numéro de chèque:</span>
-                      <span className="payment-value">{data.check_number}</span>
-                    </div>
-                    <div className="payment-row">
-                      <span className="payment-label">Banque:</span>
-                      <span className="payment-value">{data.bank_name}</span>
-                    </div>
-                    <div className="payment-row">
-                      <span className="payment-label">Date d'émission:</span>
-                      <span className="payment-value">{data.issue_date}</span>
-                    </div>
-                    <div className="payment-row">
-                      <span className="payment-label">Montant du chèque:</span>
-                      <span className="payment-value warning">
-                        {Number(data.payment_amount).toLocaleString('fr-FR')} F CFA (en attente)
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+              {/* Colonne droite - Montant versé et informations supplémentaires */}
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {!isCheckPayment && (
+                    <Box sx={{
+                      p: 1.5,
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}>
+                      <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                        Montant versé
+                      </Typography>
+                      <Typography variant="body2" sx={{
+                        fontWeight: 700,
+                        color: '#10b981',
+                        textAlign: 'center',
+                        fontSize: '1rem'
+                      }}>
+                        {Number(data.payment_amount).toLocaleString('fr-FR')} F CFA
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  {data.payment_method === 'check' && (
+                    <>
+                      <Box sx={{
+                        p: 1.5,
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                          Montant du chèque
+                        </Typography>
+                        <Typography variant="body2" sx={{
+                          fontWeight: 700,
+                          color: '#ef4444',
+                          textAlign: 'center',
+                          fontSize: '1rem',
+                          fontStyle: 'italic'
+                        }}>
+                          {Number(data.payment_amount).toLocaleString('fr-FR')} F CFA (en attente)
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{
+                        p: 1.5,
+                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(245, 158, 11, 0.2)'
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600, mb: 0.5, fontSize: '0.65rem' }}>
+                          Numéro de chèque
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 700, fontSize: '0.8rem' }}>
+                          {data.check_number}
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{
+                        p: 1.5,
+                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(245, 158, 11, 0.2)'
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600, mb: 0.5, fontSize: '0.65rem' }}>
+                          Banque
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 700, fontSize: '0.8rem' }}>
+                          {data.bank_name}
+                        </Typography>
+                      </Box>
+                      
+                      <Box sx={{
+                        p: 1.5,
+                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(245, 158, 11, 0.2)'
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600, mb: 0.5, fontSize: '0.65rem' }}>
+                          Date d'émission
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 700, fontSize: '0.8rem' }}>
+                          {data.issue_date}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                  
+                  {data.payment_method === 'transfer' && (
+                    <Box sx={{
+                      p: 1.5,
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(59, 130, 246, 0.2)'
+                    }}>
+                      <Typography variant="caption" sx={{ color: '#3b82f6', fontWeight: 600, mb: 0.5, textAlign: 'center', fontSize: '0.7rem' }}>
+                        Virement approuvé
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 500, textAlign: 'center', fontSize: '0.65rem' }}>
+                        Le virement sera traité automatiquement
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
             
             {/* Reste à payer - Mise en évidence */}
-            <div className={`remaining-box ${remaining > 0 ? 'pending' : 'paid'}`}>
-              <div className="remaining-row">
-                <span className={`remaining-title ${remaining > 0 ? 'pending' : 'paid'}`}>
-                  Reste à payer
-                </span>
-                <span className={`remaining-title ${remaining > 0 ? 'pending' : 'paid'}`}>
-                  {remaining.toLocaleString('fr-FR')} F CFA
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+            <Box sx={{
+              mt: 1.5,
+              p: 2,
+              background: remaining > 0 
+                ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+              borderRadius: '8px',
+              border: `1px solid ${remaining > 0 ? '#ef4444' : '#10b981'}`,
+              textAlign: 'center',
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '-1px',
+                left: '-1px',
+                right: '-1px',
+                bottom: '-1px',
+                background: remaining > 0 
+                  ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                  : 'linear-gradient(135deg, #10b981, #059669)',
+                borderRadius: '8px',
+                zIndex: -1,
+                opacity: 0.2,
+              }
+            }}>
+              <Typography variant="body2" sx={{
+                fontWeight: 700,
+                color: remaining > 0 ? '#ef4444' : '#10b981',
+                mb: 1,
+                fontSize: '0.9rem'
+              }}>
+                Reste à payer
+              </Typography>
+              <Typography variant="h6" sx={{
+                fontWeight: 800,
+                color: remaining > 0 ? '#ef4444' : '#10b981',
+                fontSize: '1.3rem',
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}>
+                {remaining.toLocaleString('fr-FR')} F CFA
+              </Typography>
+              <Typography variant="caption" sx={{
+                color: remaining > 0 ? '#ef4444' : '#10b981',
+                fontWeight: 600,
+                mt: 1,
+                opacity: 0.8,
+                fontSize: '0.75rem'
+              }}>
+                {remaining > 0 ? 'Paiement incomplet' : 'Paiement complet'}
+              </Typography>
+            </Box>
+            
+            {/* Note explicative */}
+            <Box sx={{
+              mt: 2,
+              p: 2,
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
+              borderRadius: '8px',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              position: 'relative'
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 1.5
+              }}>
+                <Box sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold'
+                }}>
+                  ℹ️
+                </Box>
+                <Typography variant="body2" sx={{
+                  fontWeight: 700,
+                  color: '#3b82f6',
+                  fontSize: '0.9rem'
+                }}>
+                  Note importante
+                </Typography>
+              </Box>
+              <Typography variant="caption" sx={{
+                color: '#374151',
+                lineHeight: 1.4,
+                fontSize: '0.8rem'
+              }}>
+                <strong>Le montant versé ({Number(data.payment_amount || 0).toLocaleString('fr-FR')} F CFA)</strong> est d'abord appliqué aux frais d'inscription ({Number(data.frais_inscription || 0).toLocaleString('fr-FR')} F CFA). Le solde restant sera déduit de la scolarité totale.
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
 
         {/* Footer avec statut et utilisateur */}
-        <div className="footer">
-          <small>
-                  {(() => {
-                    const userInfo = localStorage.getItem('user');
-                    if (userInfo) {
-                      try {
-                        const userData = JSON.parse(userInfo);
-                        const userName = userData.first_name && userData.last_name 
-                          ? `${userData.first_name} ${userData.last_name}` 
-                          : userData.email || 'Utilisateur connecté';
-                        const roleLabel = getRoleLabel(userData.role);
-                        return `${userName} (${roleLabel})`;
-                      } catch {
-                        return 'Utilisateur connecté';
-                      }
-                    }
-                    return 'Utilisateur connecté';
-                  })()}
-          </small>
-          <div className="status-section">
-            <span className="status-label">Statut:</span>
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingTop: '16px',
+          borderTop: '1px solid rgba(102, 126, 234, 0.1)',
+          marginTop: '16px',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+          borderRadius: '8px',
+          p: 2
+        }}>
+          <Typography variant="caption" sx={{
+            color: '#64748b',
+            fontWeight: 500,
+            fontSize: '0.75rem',
+            background: 'rgba(255,255,255,0.8)',
+            padding: '6px 12px',
+            borderRadius: '16px',
+            border: '1px solid rgba(102, 126, 234, 0.2)'
+          }}>
+            {(() => {
+              const userInfo = localStorage.getItem('user');
+              if (userInfo) {
+                try {
+                  const userData = JSON.parse(userInfo);
+                  const userName = userData.first_name && userData.last_name 
+                    ? `${userData.first_name} ${userData.last_name}` 
+                    : userData.email || 'Utilisateur connecté';
+                  const roleLabel = getRoleLabel(userData.role);
+                  return `${userName} (${roleLabel})`;
+                } catch {
+                  return 'Utilisateur connecté';
+                }
+              }
+              return 'Utilisateur connecté';
+            })()}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#64748b' }}>
+              Statut:
+            </Typography>
             {isCheckPayment ? 
-              <span className="chip chip-warning">Chèque en attente</span> : 
+              <Chip 
+                label="Chèque en attente"
+                sx={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.7rem',
+                  height: '20px'
+                }}
+              /> : 
               remaining > 0 ? 
-                <span className="chip chip-error">Non soldé</span> : 
-                <span className="chip chip-success">Soldé</span>
+                <Chip 
+                  label="Non soldé"
+                  sx={{
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: '0.7rem',
+                    height: '20px'
+                  }}
+                /> : 
+                <Chip 
+                  label="Soldé"
+                  sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    fontWeight: 600,
+                    fontSize: '0.7rem',
+                    height: '20px'
+                  }}
+                />
             }
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         <Divider sx={{ my: 3, width: '100%' }} />
         
         {/* Message informatif intégré dans le reçu pour les paiements par chèque */}
         {isCheckPayment && (
-          <div className="message-box">
-            <div className="message-header">
-              <span className="message-icon">⏳</span>
-              <div className="message-title">Paiement par chèque en attente d'approbation</div>
-            </div>
-            <div className="message-content">
-              <strong>Important :</strong> Votre chèque a été soumis avec succès mais n'a pas encore été approuvé par le service comptabilité. 
-              Le montant du chèque n'est donc pas encore pris en compte dans votre solde.
-            </div>
-            <div className="message-content" style={{ marginTop: '12px' }}>
-              <strong>Prochaines étapes :</strong> Une fois que votre chèque sera approuvé par le service comptabilité, 
-              vous pourrez revenir à l'école pour récupérer un reçu en bonne et due forme.
-            </div>
-            <div className="message-footer">
+          <Box sx={{
+            mt: 2,
+            p: 2.5,
+            background: 'linear-gradient(45deg, rgba(255, 243, 224, 0.8) 0%, rgba(255, 224, 178, 0.8) 100%)',
+            border: '2px solid #ff9800',
+            borderRadius: '12px',
+            position: 'relative',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: '-2px',
+              left: '-2px',
+              right: '-2px',
+              bottom: '-2px',
+              background: 'linear-gradient(45deg, #ff9800, #f57c00)',
+              borderRadius: '12px',
+              zIndex: -1,
+              opacity: 0.3,
+            }
+          }}>
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              mb: 2
+            }}>
+              <Box sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.3)'
+              }}>
+                ⏳
+              </Box>
+              <Typography variant="h6" sx={{
+                fontWeight: 700,
+                color: '#e65100',
+                fontSize: '1rem'
+              }}>
+                Paiement par chèque en attente d'approbation
+              </Typography>
+            </Box>
+            
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" sx={{
+                color: '#333',
+                lineHeight: 1.4,
+                fontSize: '0.8rem',
+                mb: 1.5,
+                display: 'block'
+              }}>
+                <strong>Important :</strong> Votre chèque a été soumis avec succès mais n'a pas encore été approuvé par le service comptabilité. 
+                Le montant du chèque n'est donc pas encore pris en compte dans votre solde.
+              </Typography>
+              
+              <Typography variant="caption" sx={{
+                color: '#333',
+                lineHeight: 1.4,
+                fontSize: '0.8rem',
+                mb: 1.5,
+                display: 'block'
+              }}>
+                <strong>Prochaines étapes :</strong> Une fois que votre chèque sera approuvé par le service comptabilité, 
+                vous pourrez revenir à l'école pour récupérer un reçu en bonne et due forme.
+              </Typography>
+            </Box>
+            
+            <Typography variant="caption" sx={{
+              color: '#e65100',
+              fontStyle: 'italic',
+              fontWeight: 600,
+              textAlign: 'center',
+              p: 1.5,
+              background: 'rgba(255, 255, 255, 0.5)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 152, 0, 0.3)',
+              fontSize: '0.75rem'
+            }}>
               Merci de votre compréhension.
-            </div>
-          </div>
+            </Typography>
+          </Box>
         )}
       </Paper>
 
-      <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center', width: '100%', maxWidth: 700, mt: 1 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        gap: 2, 
+        justifyContent: 'center', 
+        width: '100%', 
+        maxWidth: 700, 
+        mt: 2,
+        flexWrap: 'wrap'
+      }}>
         <Button
           variant="outlined"
           color="secondary"
           onClick={handleDownload}
-          sx={{ fontWeight: 600, px: 4, py: 1.5, fontSize: 16 }}
+          sx={{ 
+            fontWeight: 600, 
+            px: 3, 
+            py: 1.5, 
+            fontSize: 14,
+            borderRadius: '8px',
+            borderWidth: '2px',
+            borderColor: '#764ba2',
+            color: '#764ba2',
+            '&:hover': {
+              borderColor: '#667eea',
+              backgroundColor: 'rgba(118, 75, 162, 0.05)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(118, 75, 162, 0.2)',
+            },
+            transition: 'all 0.3s ease',
+            minWidth: '140px'
+          }}
+          startIcon={<CloudUploadIcon />}
         >
-          Télécharger le reçu
+          Télécharger
         </Button>
         <Button
           variant="contained"
-          color="primary"
           onClick={handlePrint}
-          sx={{ fontWeight: 600, px: 4, py: 1.5, fontSize: 16 }}
+          sx={{ 
+            fontWeight: 600, 
+            px: 3, 
+            py: 1.5, 
+            fontSize: 14,
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+            },
+            transition: 'all 0.3s ease',
+            minWidth: '140px'
+          }}
+          startIcon={<PaymentIcon />}
         >
-          Imprimer le reçu
+          Imprimer
         </Button>
       </Box>
-      <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center', width: '100%', maxWidth: 700, mt: 1 }}>
+      
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        width: '100%', 
+        maxWidth: 700, 
+        mt: 1.5 
+      }}>
         <Button
           variant="contained"
-          color="primary"
           onClick={onClose}
-          sx={{ fontWeight: 600, px: 4, py: 1.5, fontSize: 16 }}
+          sx={{ 
+            fontWeight: 600, 
+            px: 4, 
+            py: 1.5, 
+            fontSize: 14,
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+            },
+            transition: 'all 0.3s ease',
+            minWidth: '120px'
+          }}
+          startIcon={<CheckCircleIcon />}
         >
           Fermer
         </Button>
@@ -983,19 +1586,23 @@ const InscrptionPre = ({ onClose, initialData }: { onClose: () => void, initialD
       console.log('Réponse du serveur:', response.data);
       
           const now = new Date();
+          // Calculer le montant total de la scolarité (pas seulement les frais d'inscription)
+          const totalScolarite = selectedClass ? (formData.is_assigned ? (selectedClass.level_amount || 0) : (selectedClass.level_amount_non_assigned || 0)) : 0;
+          
           setReceiptData({
             ...payload,
             date: now.toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' }),
             student_code: response.data.student_code,
-            parent_code: response.data.parent_code, // <-- toujours la valeur backend
+            parent_code: response.data.parent_code,
             desiredClassName: formData.desiredClassName,
-            total_due: classAmount,
+            total_due: totalScolarite, // Montant total de la scolarité
+            frais_inscription: classAmount, // Frais d'inscription séparés
             payment_amount: formData.paymentAmount,
-        payment_method: formData.paymentMethod,
-        check_number: formData.paymentMethod === 'check' ? formData.checkNumber : undefined,
-        bank_name: formData.paymentMethod === 'check' ? formData.bankName : undefined,
-        issue_date: formData.paymentMethod === 'check' ? formData.issueDate : undefined,
-      });
+            payment_method: formData.paymentMethod,
+            check_number: formData.paymentMethod === 'check' ? formData.checkNumber : undefined,
+            bank_name: formData.paymentMethod === 'check' ? formData.bankName : undefined,
+            issue_date: formData.paymentMethod === 'check' ? formData.issueDate : undefined,
+          });
       
       console.log('ReceiptData défini:', {
         ...payload,
@@ -1003,7 +1610,8 @@ const InscrptionPre = ({ onClose, initialData }: { onClose: () => void, initialD
         student_code: response.data.student_code,
         parent_code: response.data.parent_code,
         desiredClassName: formData.desiredClassName,
-        total_due: classAmount,
+        total_due: totalScolarite,
+        frais_inscription: classAmount,
         payment_amount: formData.paymentAmount,
         payment_method: formData.paymentMethod,
       });

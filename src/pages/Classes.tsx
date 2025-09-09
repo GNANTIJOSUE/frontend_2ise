@@ -105,6 +105,14 @@ const Classes = () => {
         });
         if (isMounted) {
           const normalized = res.data.map((c: any) => ({ ...c, id: c.id || c._id }));
+          console.log('Classes reçues du backend pour l\'année', schoolYear, ':', normalized);
+          const schoolYearsInfo = normalized.map((c: any) => ({
+            name: c.nom || c.name,
+            school_year: c.school_year,
+            academic_year: c.academic_year,
+            year: c.year
+          }));
+          console.log('Années scolaires des classes:', schoolYearsInfo);
           setClasses(normalized);
         }
       } catch (err: any) {
@@ -138,23 +146,59 @@ const Classes = () => {
     return niveauOrder.indexOf(niveau);
   }
 
+  // Fonction pour déterminer le cycle d'un niveau
+  const getCycle = (niveau: string) => {
+    const premierCycle = ['6ème', '5ème', '4ème', '3ème'];
+    const secondCycle = ['Seconde', 'Première', 'Terminale'];
+    
+    if (premierCycle.includes(niveau)) {
+      return 'Premier Cycle';
+    } else if (secondCycle.includes(niveau)) {
+      return 'Second Cycle';
+    }
+    return '';
+  };
+
+  // Fonction pour obtenir la couleur du cycle
+  const getCycleColor = (cycle: string) => {
+    switch (cycle) {
+      case 'Premier Cycle':
+        return 'primary';
+      case 'Second Cycle':
+        return 'secondary';
+      default:
+        return 'default';
+    }
+  };
+
   // Trie les classes filtrées par niveau
   const filteredClasses = classes.filter((classe) => {
     // On adapte les champs selon la structure de la classe reçue du backend
     const nom = classe.nom || classe.name || '';
     const niveau = classe.niveau || classe.level || '';
     const prof = classe.professeurPrincipal || classe.teacher || '';
-    return (
+    const classeSchoolYear = classe.school_year || classe.academic_year || classe.year || '';
+    
+    // Filtrage par année scolaire
+    const matchesSchoolYear = !classeSchoolYear || classeSchoolYear === schoolYear;
+    
+    // Filtrage par terme de recherche
+    const matchesSearch = (
       nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prof.toLowerCase().includes(searchTerm.toLowerCase()) ||
       niveau.toLowerCase().includes(searchTerm.toLowerCase())
     );
+    
+    return matchesSchoolYear && matchesSearch;
   })
   .sort((a, b) => {
     const niveauA = a.niveau || a.level || '';
     const niveauB = b.niveau || b.level || '';
     return getNiveauIndex(niveauA) - getNiveauIndex(niveauB);
   });
+
+  // Debug: afficher les classes filtrées
+  console.log('Classes filtrées pour l\'année', schoolYear, ':', filteredClasses.length, 'classes');
 
   // Grouper les classes par niveau
   const groupedClasses = filteredClasses.reduce((groups: any, classe) => {
@@ -531,6 +575,21 @@ const Classes = () => {
                     <Typography variant="h5" component="h2" sx={{ mb: 1, fontWeight: 'bold' }}>
                       {niveau}
                     </Typography>
+                    
+                    {/* Affichage du cycle */}
+                    <Box sx={{ mb: 2 }}>
+                      <Chip 
+                        label={getCycle(niveau)} 
+                        color={getCycleColor(getCycle(niveau)) as any}
+                        variant="filled"
+                        sx={{ 
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                          height: 28
+                        }}
+                      />
+                    </Box>
+                    
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 'bold' }}>
                       {getClassCount(niveau)} classe{getClassCount(niveau) !== 1 ? 's' : ''}
                     </Typography>

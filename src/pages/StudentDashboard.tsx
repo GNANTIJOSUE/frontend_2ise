@@ -90,6 +90,7 @@ const StudentDashboard = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [recentGrades, setRecentGrades] = useState<any[]>([]);
   const [loadingRecentGrades, setLoadingRecentGrades] = useState(false);
+  const [totalSubjectsCount, setTotalSubjectsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [trimesterRank, setTrimesterRank] = useState<{ rank: number; total: number; moyenne: number | null } | null>(null);
   const [annualAverage, setAnnualAverage] = useState<{ moyenne_annuelle: number, rank: number, total: number } | null>(null);
@@ -205,6 +206,24 @@ const StudentDashboard = () => {
           }).finally(() => {
             if (isMounted) setLoadingRecentGrades(false);
           });
+
+          // Charger le nombre total de matières de la classe
+          if (studentClassId) {
+            axios.get(`https://2ise-groupe.com/api/students/class-subjects-count?class_id=${studentClassId}&school_year=${schoolYear}`, {
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 5000
+            }).then(response => {
+              if (isMounted) {
+                console.log('[StudentDashboard] Nombre total de matières reçu:', response.data);
+                setTotalSubjectsCount(response.data.total_subjects || 0);
+              }
+            }).catch(err => {
+              if (isMounted) {
+                console.error("[StudentDashboard] ERREUR lors du chargement du nombre de matières:", err);
+                setTotalSubjectsCount(0);
+              }
+            });
+          }
         }
 
         // Ajout récupération moyenne annuelle
@@ -655,10 +674,10 @@ const StudentDashboard = () => {
               ))}
             </Grid>
             
-            {recentGrades.length > 3 && (
+            {totalSubjectsCount > 3 && (
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
-                  Et {recentGrades.length - 3} autres matières...
+                  Et {totalSubjectsCount - 3} autres matières...
                 </Typography>
               </Box>
             )}

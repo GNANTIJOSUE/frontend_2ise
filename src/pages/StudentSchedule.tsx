@@ -34,6 +34,7 @@ interface ScheduleItem {
   teacher_last_name: string;
   subject_id: number;
   teacher_id: number;
+  room_name?: string;
 }
 
 interface ScheduleData {
@@ -339,6 +340,11 @@ const StudentSchedule = () => {
                               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: 13 }}>
                                 {course.teacher_first_name} {course.teacher_last_name}
                               </Typography>
+                              {course.room_name && (
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                                  📍 {course.room_name}
+                                </Typography>
+                              )}
                             </Box>
                           ) : null}
                         </td>

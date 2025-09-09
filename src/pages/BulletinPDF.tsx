@@ -141,10 +141,31 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
 
     // Fonction pour générer le HTML du bulletin à partir des données
     const generateBulletinHTML = () => {
-      const formatMoyenne = (moyenne: number | string) => {
-        if (typeof moyenne === 'string') {
-          return moyenne;
+      console.warn('🚨 FONCTION generateBulletinHTML APPELÉE DANS BulletinPDF - Vérifiez la console !');
+      console.log('🔍 DEBUG BulletinPDF - Données reçues:', {
+        studentName: `${student.last_name} ${student.first_name}`,
+        className: student.classe_name,
+        bulletinSubjects: bulletin.map(s => ({ name: s.subject_name, type: s.subject_type })),
+        hasFrenchSubject: bulletin.some(s => s.subject_name === 'Français'),
+        bulletinLength: bulletin.length
+      });
+      
+      const formatMoyenne = (moyenne: number | string | null | undefined) => {
+        // Gérer les cas null/undefined
+        if (moyenne === null || moyenne === undefined) {
+          return '-';
         }
+        
+        if (typeof moyenne === 'string') {
+          // Si c'est déjà une chaîne, vérifier si elle contient une virgule
+          if (moyenne.includes(',')) {
+            return moyenne;
+          }
+          // Sinon, convertir en nombre et formater
+          const num = parseFloat(moyenne);
+          return isNaN(num) ? '-' : num.toFixed(2).replace('.', ',');
+        }
+        // Si c'est un nombre
         return moyenne.toFixed(2).replace('.', ',');
       };
       
@@ -168,9 +189,98 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
       
       const individualSubjects = [] as any[];
       
-      // Classer les matières par type
+      // Classer les matières par type et gérer les sous-matières de français
       bulletin.forEach((subject) => {
         const subjectType = subject.subject_type || 'AUTRES';
+        
+        // Vérifier si c'est une sous-matière de français
+        if (subject.is_sub_subject && subject.parent_subject === 'Français') {
+          // Ne pas traiter les sous-matières individuellement, elles seront groupées
+          return;
+        }
+        
+        // Vérifier si c'est la matière principale "Français"
+        if (subject.subject_name === 'Français') {
+          // Vérifier si c'est une classe du premier cycle
+          const className = student.classe_name?.toLowerCase() || '';
+          const isFirstCycle = className.includes('6ème') || className.includes('5ème') || 
+                              className.includes('4ème') || className.includes('3ème') ||
+                              className.includes('6eme') || className.includes('5eme') || 
+                              className.includes('4eme') || className.includes('3eme') ||
+                              className.includes('6e') || className.includes('5e') || 
+                              className.includes('4e') || className.includes('3e') ||
+                              className.includes('sixième') || className.includes('cinquième') ||
+                              className.includes('quatrième') || className.includes('troisième') ||
+                              className.includes('sixieme') || className.includes('cinquieme') ||
+                              className.includes('quatrieme') || className.includes('troisieme') ||
+                              className.includes('6 éme') || className.includes('5 éme') ||
+                              className.includes('4 éme') || className.includes('3 éme') ||
+                              className.includes('6 eme') || className.includes('5 eme') ||
+                              className.includes('4 eme') || className.includes('3 eme');
+          
+          console.log('🔍 DEBUG BulletinPDF - Français détecté:', {
+            className: student.classe_name,
+            classNameLower: className,
+            isFirstCycle,
+            subjectName: subject.subject_name
+          });
+          
+          if (isFirstCycle) {
+            // Définir les sous-matières de français disponibles
+            const availableSubSubjects = [
+              { name: 'Grammaire', coefficient: 1 },
+              { name: 'Orthographe', coefficient: 1 },
+              { name: 'Expression écrite', coefficient: 1 }
+            ];
+            
+            // Récupérer les notes existantes pour les sous-matières
+            const existingSubSubjects = subject.notes && Array.isArray(subject.notes) 
+              ? subject.notes.filter((note: any) => note.sub_subject_name)
+              : [];
+            
+            // Créer une entrée spéciale pour le français avec toutes les sous-matières
+            const frenchEntry = {
+              ...subject,
+              subject_name: 'Français',
+              moyenne: subject.moyenne, // Moyenne calculée des sous-matières
+              coefficient: subject.coefficient,
+              sub_subjects: availableSubSubjects.map((subSubject) => {
+                // Chercher si cette sous-matière a des notes
+                const existingNote = existingSubSubjects.find((note: any) => 
+                  note.sub_subject_name === subSubject.name
+                );
+                
+                return {
+                  name: subSubject.name,
+                  moyenne: existingNote ? existingNote.moyenne : null,
+                  coefficient: subSubject.coefficient
+                };
+              })
+            };
+            
+            console.log('✅ DEBUG BulletinPDF - Sous-matières créées:', {
+              subSubjects: frenchEntry.sub_subjects,
+              frenchEntry: frenchEntry
+            });
+            
+            if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
+              subjectsByType[subjectType as keyof typeof subjectsByType].push(frenchEntry);
+            } else {
+              individualSubjects.push(frenchEntry);
+            }
+            return;
+          } else {
+            // Pour les classes du second cycle, afficher le français normalement sans sous-matières
+            console.log('ℹ️ DEBUG BulletinPDF - Classe du second cycle, affichage normal');
+            if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
+              subjectsByType[subjectType as keyof typeof subjectsByType].push(subject);
+            } else {
+              individualSubjects.push(subject);
+            }
+            return;
+          }
+        }
+        
         if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
           subjectsByType[subjectType as keyof typeof subjectsByType].push(subject);
         } else {
@@ -207,17 +317,49 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
       
       // Ajouter d'abord les matières individuelles
       individualSubjects.forEach((subject) => {
-        tableRows += `
-          <tr>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.rang || '-'}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
-            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
-          </tr>
-        `;
+        // Vérifier si c'est le français avec des sous-matières
+        if (subject.subject_name === 'Français' && subject.sub_subjects && subject.sub_subjects.length > 0) {
+          // Afficher d'abord la ligne principale du français
+          tableRows += `
+            <tr>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.subject_name}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne(subject.moyenne)}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${subject.coefficient || 1}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${subject.rang || '-'}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.teacher_name || '-'}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${getAppreciation(subject.moyenne)}</td>
+            </tr>
+          `;
+          
+          // Afficher les sous-matières
+          subject.sub_subjects.forEach((subSubject: any) => {
+            tableRows += `
+              <tr style="background-color: #f9f9f9;">
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px; padding-left: 15px;">• ${subSubject.name}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne(subSubject.moyenne)}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${subSubject.coefficient || 1}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne((subSubject.moyenne || 0) * (subSubject.coefficient || 1))}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">-</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">-</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">${getAppreciation(subSubject.moyenne)}</td>
+              </tr>
+            `;
+          });
+        } else {
+          // Matière normale
+          tableRows += `
+            <tr>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.rang || '-'}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
+            </tr>
+          `;
+        }
       });
       
       // Ajouter les matières par type avec leurs bilans
@@ -231,17 +373,49 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
         if (subjects.length > 0) {
           // Ajouter les matières du type
           subjects.forEach((subject) => {
-            tableRows += `
-              <tr>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.rang || '-'}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
-                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
-              </tr>
-            `;
+            // Vérifier si c'est le français avec des sous-matières
+            if (subject.subject_name === 'Français' && subject.sub_subjects && subject.sub_subjects.length > 0) {
+              // Afficher d'abord la ligne principale du français
+              tableRows += `
+                <tr>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.subject_name}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne(subject.moyenne)}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${subject.coefficient || 1}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${subject.rang || '-'}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.teacher_name || '-'}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${getAppreciation(subject.moyenne)}</td>
+                </tr>
+              `;
+              
+              // Afficher les sous-matières
+              subject.sub_subjects.forEach((subSubject: any) => {
+                tableRows += `
+                  <tr style="background-color: #f9f9f9;">
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px; padding-left: 15px;">• ${subSubject.name}</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne(subSubject.moyenne)}</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${subSubject.coefficient || 1}</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne((subSubject.moyenne || 0) * (subSubject.coefficient || 1))}</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">-</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">-</td>
+                    <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">${getAppreciation(subSubject.moyenne)}</td>
+                  </tr>
+                `;
+              });
+            } else {
+              // Matière normale
+              tableRows += `
+                <tr>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.rang || '-'}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
+                </tr>
+              `;
+            }
           });
           
           // Calculer et ajouter le bilan du type
@@ -276,8 +450,8 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
           <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(totalMoyCoef)}</td>
           <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;"></td>
           <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;"></td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">
-            MOY. TRIM.: ${formatMoyenne(moyenneTrimestrielle)}/20 | RANG: ${rangClasse || 'N/A'}
+          <td style="border: 1px solid black !important; padding: 6px 8px !important; text-align: left !important; font-size: 11px !important; font-weight: 900 !important; color: #000 !important; background-color: #f8f8f8 !important;">
+            <span style="font-size: 16px !important; font-weight: 900 !important; color: #000000 !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important; letter-spacing: 0.5px !important;">MOY. TRIM.: ${formatMoyenne(moyenneTrimestrielle)}/20</span> | <span style="font-size: 16px !important; font-weight: 900 !important; color: #000000 !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important; letter-spacing: 0.5px !important;">RANG: ${rangClasse || 'N/A'}</span>
           </td>
         </tr>
       `;
@@ -547,6 +721,15 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
                   .font-italic { font-style: italic; }
                   .text-small { font-size: 8px; }
                   
+                  /* Styles spécifiques pour la moyenne trimestrielle */
+                  .moyenne-trimestrielle {
+                    font-size: 16px !important;
+                    font-weight: 900 !important;
+                    color: #000000 !important;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+                    letter-spacing: 0.5px !important;
+                  }
+                  
                   /* Styles pour l'impression */
                   @media print {
                     body { 
@@ -628,6 +811,23 @@ const BulletinPDF = forwardRef<BulletinPDFRef, BulletinPDFProps>(
                     @page {
                       size: A4;
                       margin: 5mm;
+                    }
+                    
+                    /* Styles spécifiques pour la moyenne trimestrielle et le rang lors de l'impression */
+                    span[style*="font-size: 16px"] {
+                      font-size: 14px !important;
+                      font-weight: 900 !important;
+                      color: #000000 !important;
+                      text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+                      letter-spacing: 0.3px !important;
+                    }
+                    
+                    /* Forcer les styles de la moyenne trimestrielle */
+                    td[style*="font-size: 16px"] {
+                      font-size: 14px !important;
+                      font-weight: 900 !important;
+                      color: #000000 !important;
+                      text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
                     }
                   }
                 </style>

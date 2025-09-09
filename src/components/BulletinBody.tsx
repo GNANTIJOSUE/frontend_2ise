@@ -5,7 +5,7 @@ import { useTrimesterId } from '../hooks/useTrimesterId';
 
 interface ResultRow {
   subject: string;
-  moyenne: number | string;
+  moyenne: number | string | null;
   coefficient: number | string;
   moyCoeff: number | string;
   rang: string | number;
@@ -13,6 +13,7 @@ interface ResultRow {
   appreciation: string;
   type?: 'LITTERAIRES' | 'SCIENTIFIQUES' | 'AUTRES';
   isTotal?: boolean;
+  subSubjects?: ResultRow[]; // Pour les sous-matières de français
 }
 
 
@@ -93,8 +94,8 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
 
   // Responsive cell styles
   const cellStyle = { 
-    fontSize: isMobile ? 6 : 13, 
-    padding: isMobile ? '1px 1px' : '4px 8px', 
+    fontSize: isMobile ? 10 : 15, 
+    padding: isMobile ? '2px 2px' : '6px 10px', 
     border: '1px solid #222',
     wordBreak: 'break-word',
     verticalAlign: 'middle'
@@ -104,7 +105,7 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
     fontWeight: 'bold', 
     background: '#fff', 
     textAlign: 'center',
-    fontSize: isMobile ? 9 : 13
+    fontSize: isMobile ? 12 : 16
   };
 
   const typeLabels = {
@@ -775,23 +776,159 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
   
 
   
+  // Fonction pour détecter si c'est une classe du premier cycle
+  const isFirstCycle = (className: string): boolean => {
+    if (!className) return false;
+    const classNameLower = className.toLowerCase().trim();
+    return classNameLower.includes('6ème') || 
+           classNameLower.includes('6eme') || 
+           classNameLower.includes('6 éme') ||
+           classNameLower.includes('6eme') ||
+           classNameLower.includes('sixième') ||
+           classNameLower.includes('sixieme') ||
+           classNameLower.includes('5ème') || 
+           classNameLower.includes('5eme') || 
+           classNameLower.includes('5 éme') ||
+           classNameLower.includes('cinquième') ||
+           classNameLower.includes('cinquieme') ||
+           classNameLower.includes('4ème') || 
+           classNameLower.includes('4eme') || 
+           classNameLower.includes('4 éme') ||
+           classNameLower.includes('quatrième') ||
+           classNameLower.includes('quatrieme') ||
+           classNameLower.includes('3ème') || 
+           classNameLower.includes('3eme') || 
+           classNameLower.includes('3 éme') ||
+           classNameLower.includes('troisième') ||
+           classNameLower.includes('troisieme');
+  };
+
+  // Fonction pour calculer l'appréciation basée sur la moyenne
+  const getAppreciation = (moyenne: number | string | null | undefined): string => {
+    // Gérer les cas null/undefined
+    if (moyenne === null || moyenne === undefined) {
+      return '-';
+    }
+    
+    const moy = typeof moyenne === 'string' ? parseFloat(moyenne.replace(',', '.')) : Number(moyenne);
+    
+    if (isNaN(moy)) return '-';
+    
+    if (moy >= 16) return 'Très bien';
+    if (moy >= 14) return 'Bien';
+    if (moy >= 12) return 'Assez bien';
+    if (moy >= 10) return 'Passable';
+    if (moy >= 8) return 'Faible';
+    return 'Médiocre';
+  };
+
   // Traiter toutes les matières et les classer par type
+  const processedSubjects = new Set<string>(); // Pour éviter les doublons
+  
+  // DEBUG: Afficher tous les résultats reçus
+  console.log('🔍 DEBUG BulletinBody - Tous les résultats reçus:', results.map(r => ({
+    subject: r.subject,
+    moyenne: r.moyenne,
+    isTotal: r.isTotal
+  })));
+  
+  // D'abord, identifier toutes les sous-matières françaises
+  const frenchSubSubjects = results.filter(r => 
+    !r.isTotal && 
+    isFirstCycle(student.classe) &&
+    (r.subject.toLowerCase().includes('grammaire') ||
+     r.subject.toLowerCase().includes('orthographe') ||
+     r.subject.toLowerCase().includes('expression écrite') ||
+     r.subject.toLowerCase().includes('expression ecrite'))
+  );
+
+  // Si on a des sous-matières françaises, créer la matière principale
+  if (frenchSubSubjects.length > 0 && isFirstCycle(student.classe)) {
+    console.warn('🔍 DEBUG BulletinBody - Sous-matières françaises détectées:', frenchSubSubjects);
+    
+    // Calculer la moyenne de français
+    let totalMoyenne = 0;
+    let validGradesCount = 0;
+    
+    frenchSubSubjects.forEach(subSubject => {
+      const moyenne = typeof subSubject.moyenne === 'string' ? 
+        parseFloat(subSubject.moyenne.replace(',', '.')) : 
+        Number(subSubject.moyenne);
+      if (!isNaN(moyenne) && moyenne > 0) {
+        totalMoyenne += moyenne;
+        validGradesCount++;
+      }
+    });
+    
+    // Pour le premier cycle : moyenne française = (Grammaire + Orthographe + Expression écrite) / 3
+    const moyenneFrancais = validGradesCount > 0 ? totalMoyenne / 3 : 0;
+    
+    // Créer la matière Français principale
+    const francaisPrincipal: ResultRow = {
+      subject: 'Français',
+      moyenne: moyenneFrancais > 0 ? moyenneFrancais : null,
+      coefficient: 1,
+      moyCoeff: moyenneFrancais > 0 ? moyenneFrancais : 0,
+      rang: '-',
+      professeur: frenchSubSubjects[0]?.professeur || 'N/A',
+      appreciation: moyenneFrancais > 0 ? getAppreciation(moyenneFrancais) : '-',
+      type: 'LITTERAIRES',
+      subSubjects: frenchSubSubjects
+    };
+    
+    // Ajouter la matière Français principale
+    rowsByType.LITTERAIRES.push(francaisPrincipal);
+    processedSubjects.add('français');
+    
+    // Marquer les sous-matières comme traitées
+    frenchSubSubjects.forEach(sub => {
+      processedSubjects.add(sub.subject.toLowerCase());
+    });
+    
+    console.log('📊 DEBUG BulletinBody - Moyenne française calculée:', {
+      totalMoyenne,
+      validGradesCount,
+      moyenneFrancais: moyenneFrancais.toFixed(2),
+      subSubjects: frenchSubSubjects.length
+    });
+  }
+  
   results.forEach(row => {
     if (row.isTotal) {
       // Ignorer la ligne de total pour le moment
       return;
     }
     
-    // Classer par type pour les bilans
-    if (row.type === 'LITTERAIRES') {
-      rowsByType.LITTERAIRES.push(row);
-    } else if (row.type === 'SCIENTIFIQUES') {
-      rowsByType.SCIENTIFIQUES.push(row);
-    } else if (row.type === 'AUTRES') {
-      rowsByType.AUTRES.push(row);
+    // Ignorer les sous-matières françaises car elles sont déjà traitées
+    if (isFirstCycle(student.classe) && 
+        (row.subject.toLowerCase().includes('grammaire') ||
+         row.subject.toLowerCase().includes('orthographe') ||
+         row.subject.toLowerCase().includes('expression écrite') ||
+         row.subject.toLowerCase().includes('expression ecrite'))) {
+      // Ces sous-matières sont déjà traitées dans la logique précédente
+      return;
+    }
+    
+    // Vérifier si c'est la matière Français et si c'est une classe du premier cycle
+    if (row.subject.toLowerCase().includes('français') && isFirstCycle(student.classe)) {
+      // Ignorer car on a déjà créé la matière française principale
+      return;
     } else {
-      // Si pas de type spécifié, mettre dans AUTRES
-      rowsByType.AUTRES.push(row);
+      // Vérifier si cette matière n'a pas déjà été traitée
+      if (!processedSubjects.has(row.subject.toLowerCase())) {
+        // Classer par type pour les autres matières
+        if (row.type === 'LITTERAIRES') {
+          rowsByType.LITTERAIRES.push(row);
+        } else if (row.type === 'SCIENTIFIQUES') {
+          rowsByType.SCIENTIFIQUES.push(row);
+        } else if (row.type === 'AUTRES') {
+          rowsByType.AUTRES.push(row);
+        } else {
+          // Si pas de type spécifié, mettre dans AUTRES
+          rowsByType.AUTRES.push(row);
+        }
+        processedSubjects.add(row.subject.toLowerCase());
+      }
     }
   });
   
@@ -825,20 +962,6 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
   rowsByType.LITTERAIRES = deduplicateSubjects(rowsByType.LITTERAIRES);
   rowsByType.SCIENTIFIQUES = deduplicateSubjects(rowsByType.SCIENTIFIQUES);
   rowsByType.AUTRES = deduplicateSubjects(rowsByType.AUTRES);
-
-  // Fonction pour calculer l'appréciation basée sur la moyenne
-  const getAppreciation = (moyenne: number | string): string => {
-    const moy = typeof moyenne === 'string' ? parseFloat(moyenne.replace(',', '.')) : Number(moyenne);
-    
-    if (isNaN(moy)) return '';
-    
-    if (moy >= 16) return 'Très bien';
-    if (moy >= 14) return 'Bien';
-    if (moy >= 12) return 'Assez bien';
-    if (moy >= 10) return 'Passable';
-    if (moy >= 8) return 'Faible';
-    return 'Médiocre';
-  };
 
   // Fonction pour calculer l'appréciation du Conseil de classe basée sur la moyenne
     const getConseilAppreciation = (moyenne: number | string): string => {
@@ -938,7 +1061,12 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
   const tableRows: JSX.Element[] = [];
   
   // Fonction pour formater les moyennes et rangs
-  const formatMoyenne = (moyenne: number | string): string => {
+  const formatMoyenne = (moyenne: number | string | null | undefined): string => {
+    // Gérer les cas null/undefined
+    if (moyenne === null || moyenne === undefined) {
+      return '-';
+    }
+    
     if (typeof moyenne === 'string') {
       // Si c'est déjà une chaîne, vérifier si elle contient une virgule
       if (moyenne.includes(',')) {
@@ -946,7 +1074,7 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
       }
       // Sinon, convertir en nombre et formater
       const num = parseFloat(moyenne);
-      return isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',');
+      return isNaN(num) ? '-' : num.toFixed(2).replace('.', ',');
     }
     // Si c'est un nombre
     return moyenne.toFixed(2).replace('.', ',');
@@ -985,17 +1113,83 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
       // Ajouter les matières du type
       rowsByType[type].forEach((row, idx) => {
         const subjectRank = subjectRanks[row.subject] || row.rang;
-        tableRows.push(
-          <TableRow key={type + '_' + row.subject + '_' + idx}>
-            <TableCell sx={cellStyle}>{row.subject}</TableCell>
-            <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>{formatMoyenne(row.moyenne)}</TableCell>
-            <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '50px', width: '50px' }}>{row.coefficient}</TableCell>
-            <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '70px', width: '70px' }}>{formatMoyenne(row.moyCoeff)}</TableCell>
-            <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>{formatRang(subjectRank)}</TableCell>
-            <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>{row.professeur}</TableCell>
-            <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>{getAppreciation(row.moyenne)}</TableCell>
-          </TableRow>
-        );
+        
+        // Vérifier si c'est le français avec des sous-matières
+        if (row.subject === 'Français' && row.subSubjects && row.subSubjects.length > 0) {
+          // Structure spéciale pour le français du premier cycle
+          
+          // 1. Ligne avec "Français" et les sous-matières sur la même ligne, séparés par une colonne verticale
+          tableRows.push(
+            <TableRow key={type + '_' + row.subject + '_header_' + idx}>
+              <TableCell sx={cellStyle}>
+                <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', minHeight: '60px' }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    flex: 1,
+                    borderRight: '2px solid #000',
+                    pr: 1
+                  }}>
+                    <Typography sx={{ fontWeight: 'bold', fontSize: isMobile ? 12 : 14, textAlign: 'center' }}>
+                      {row.subject}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 0.5, 
+                    flex: 1,
+                    pl: 1,
+                    justifyContent: 'center'
+                  }}>
+                    {row.subSubjects.map((subSubject, subIdx) => (
+                      <Box key={subIdx} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <Typography sx={{ fontSize: isMobile ? 12 : 14, textAlign: 'left', flex: 1 }}>
+                          {subSubject.subject}
+                        </Typography>
+                        <Typography sx={{ fontSize: isMobile ? 12 : 14, textAlign: 'right', fontWeight: 'bold', ml: 1 }}>
+                          {formatMoyenne(subSubject.moyenne)}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>
+                {formatMoyenne(row.moyenne)}
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '50px', width: '50px' }}>
+                {row.coefficient}
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '70px', width: '70px' }}>
+                {formatMoyenne(row.moyCoeff)}
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>
+                {formatRang(subjectRank)}
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>
+                {row.professeur}
+              </TableCell>
+              <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>
+                {getAppreciation(row.moyenne)}
+              </TableCell>
+            </TableRow>
+          );
+        } else {
+          // Matière normale
+          tableRows.push(
+            <TableRow key={type + '_' + row.subject + '_' + idx}>
+              <TableCell sx={cellStyle}>{row.subject}</TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>{formatMoyenne(row.moyenne)}</TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '50px', width: '50px' }}>{row.coefficient}</TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '70px', width: '70px' }}>{formatMoyenne(row.moyCoeff)}</TableCell>
+              <TableCell sx={{ ...cellStyle, textAlign: 'center', minWidth: '60px', width: '60px' }}>{formatRang(subjectRank)}</TableCell>
+              <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>{row.professeur}</TableCell>
+              <TableCell sx={{ ...cellStyle, minWidth: '150px', width: '150px' }}>{getAppreciation(row.moyenne)}</TableCell>
+            </TableRow>
+          );
+        }
       });
       
       // Calculer et ajouter le bilan du type
@@ -1127,7 +1321,6 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
             Effectif : <span style={{ fontWeight: 400 }}>{classEffectif}</span>
           </Typography>
           <Typography sx={{ fontWeight: 'bold', fontSize: isMobile ? 10 : 14 }}>Redoublant(e) : <span style={{ fontWeight: 400 }}>{student.redoublant}</span></Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: isMobile ? 10 : 14 }}>Régime : <span style={{ fontWeight: 400 }}>{student.regime}</span></Typography>
         </Box>
         {/* Colonne 3 */}
         <Box flex={1.2} sx={{ 
@@ -1249,7 +1442,7 @@ const BulletinBody: React.FC<BulletinBodyProps> = ({
         }}>
         <TableHead>
           <TableRow>
-            <TableCell sx={headerStyle}>Matière</TableCell>
+            <TableCell sx={{ ...headerStyle, minWidth: '200px', width: '200px' }}>Matière</TableCell>
             <TableCell sx={{ ...headerStyle, minWidth: '60px', width: '60px' }}>Moy</TableCell>
             <TableCell sx={{ ...headerStyle, minWidth: '50px', width: '50px' }}>Coeff</TableCell>
             <TableCell sx={{ ...headerStyle, minWidth: '70px', width: '70px' }}>M. Coeff</TableCell>

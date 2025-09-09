@@ -144,6 +144,8 @@ const TeacherDashboard = () => {
   const [selectedSchoolYearStatus, setSelectedSchoolYearStatus] = useState<{ is_active: boolean; name: string } | null>(null);
   // État pour suivre les trimestres publiés
   const [publishedTrimesters, setPublishedTrimesters] = useState<{ [trimesterName: string]: boolean }>({});
+  const [frenchSubSubjects, setFrenchSubSubjects] = useState<any[]>([]);
+  const [selectedFrenchSubSubject, setSelectedFrenchSubSubject] = useState<number | ''>('');
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -152,6 +154,18 @@ const TeacherDashboard = () => {
     const yearClosed = selectedSchoolYearStatus ? !selectedSchoolYearStatus.is_active : false;
     const trimesterPublished = selectedTrimesterId ? publishedTrimesters[trimesters.find(t => t.id === selectedTrimesterId)?.name || ''] : false;
     return yearClosed || trimesterPublished;
+  };
+
+  // Fonction helper pour vérifier si toutes les notes d'un étudiant sont publiées
+  const areAllStudentGradesPublished = (studentId: number) => {
+    const studentGrades = grades.filter(g => g.student_id === studentId);
+    return studentGrades.length > 0 && studentGrades.every(g => g.is_published);
+  };
+
+  // Fonction helper pour vérifier si le trimestre est publié (ce qui empêche d'ajouter des notes)
+  const isTrimesterPublished = () => {
+    const selectedTrimesterName = selectedTrimesterId ? trimesters.find(t => t.id === selectedTrimesterId)?.name : '';
+    return selectedTrimesterName ? publishedTrimesters[selectedTrimesterName] : false;
   };
 
   // Fonction helper pour obtenir le message d'alerte
@@ -164,6 +178,52 @@ const TeacherDashboard = () => {
       return `⚠️ Bulletin du ${selectedTrimesterName} publié - Les modifications et suppressions sont désactivées`;
     }
     return '';
+  };
+
+  // Fonction pour vérifier si la matière est le français et la classe du premier cycle UNIQUEMENT
+  const isFrenchFirstCycle = () => {
+    if (!selectedSubject || !selectedClass) {
+      console.log('🔍 isFrenchFirstCycle: selectedSubject ou selectedClass manquant', { 
+        selectedSubject, 
+        selectedClass: selectedClass?.name,
+        subjectsCount: subjects.length 
+      });
+      return false;
+    }
+    
+    const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name?.toLowerCase();
+    const isFrench = selectedSubjectName === 'français' || selectedSubjectName === 'francais';
+    
+    const className = selectedClass.name?.toLowerCase() || '';
+    
+    // Premier cycle : 6ème à 3ème
+    const isFirstCycle = className.includes('6ème') || className.includes('5ème') || 
+                        className.includes('4ème') || className.includes('3ème') ||
+                        className.includes('6eme') || className.includes('5eme') || 
+                        className.includes('4eme') || className.includes('3eme') ||
+                        className.includes('6e') || className.includes('5e') || 
+                        className.includes('4e') || className.includes('3e');
+    
+    // Second cycle : 2nde à Terminale (EXPLICITEMENT EXCLUS)
+    const isSecondCycle = className.includes('2nde') || className.includes('1ère') || 
+                         className.includes('1ere') || className.includes('terminale') ||
+                         className.includes('seconde') || className.includes('premiere');
+    
+    // Ne pas afficher si c'est le second cycle, même si c'est français
+    const result = isFrench && isFirstCycle && !isSecondCycle;
+    
+    console.log('🔍 isFrenchFirstCycle DEBUG:', {
+      selectedSubject,
+      selectedSubjectName,
+      isFrench,
+      className,
+      isFirstCycle,
+      isSecondCycle,
+      result,
+      frenchSubSubjectsCount: frenchSubSubjects.length
+    });
+    
+    return result;
   };
 
   // Fonction pour récupérer le statut de l'année scolaire sélectionnée
@@ -300,6 +360,9 @@ const TeacherDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const { data } = await axios.get(`https://2ise-groupe.com/api/teachers/${teacher?.id}/subjects/${subject.id}/classes`, {
+        params: {
+          school_year: schoolYear
+        },
         headers: { Authorization: `Bearer ${token}` }
       });
       setSubjectClasses(data);
@@ -381,6 +444,7 @@ const TeacherDashboard = () => {
       return `${now.getFullYear()}-${now.getFullYear() + 1}`;
     });
     setCoefficient(1);
+    setSelectedFrenchSubSubject(''); // Réinitialiser la sous-matière
     
     // S'assurer que selectedSubject est défini
     if (!selectedSubject && subjects.length > 0) {
@@ -414,12 +478,12 @@ const TeacherDashboard = () => {
       return;
     }
 
-    // Vérifier si le trimestre est publié
+    // Vérifier si le trimestre est publié (seulement pour empêcher l'ajout de nouvelles notes)
     const selectedTrimesterName = trimesters.find(t => t.id === selectedTrimesterId)?.name;
     if (selectedTrimesterName && publishedTrimesters[selectedTrimesterName]) {
       setSnackbar({ 
         open: true, 
-        message: `Impossible de modifier les notes : le bulletin du ${selectedTrimesterName} est publié.`, 
+        message: `Impossible d'ajouter des notes : le bulletin du ${selectedTrimesterName} est publié.`, 
         severity: 'error' 
       });
       return;
@@ -432,6 +496,12 @@ const TeacherDashboard = () => {
       return;
     }
 
+    // Validation pour le français en premier cycle
+    if (isFrenchFirstCycle() && !selectedFrenchSubSubject) {
+      setSnackbar({ open: true, message: 'Veuillez sélectionner une sous-matière de français', severity: 'error' });
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -439,6 +509,11 @@ const TeacherDashboard = () => {
         return;
       }
 
+      // Déterminer si c'est français et si on a une sous-matière sélectionnée
+      const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name?.toLowerCase();
+      const isFrench = selectedSubjectName === 'français' || selectedSubjectName === 'francais';
+      const hasSubSubject = Boolean(selectedFrenchSubSubject) && selectedFrenchSubSubject !== 0;
+      
       const payload = {
         student_id: selectedStudent.id,
         class_id: selectedClass.id,
@@ -447,10 +522,18 @@ const TeacherDashboard = () => {
         trimester_id: selectedTrimesterId,
         academic_year: schoolYear,
         coefficient: Number(coefficient) || 1,
-        subject_id: selectedSubject
+        subject_id: selectedSubject,
+        sub_subject_id: (isFrench && hasSubSubject) ? selectedFrenchSubSubject : null
       };
 
-      console.log('Payload pour ajout/modification de note:', payload);
+      console.log('🔍 DEBUG Payload pour ajout/modification de note:', {
+        payload,
+        isFrench,
+        hasSubSubject,
+        selectedFrenchSubSubject,
+        selectedSubjectName,
+        isFrenchFirstCycle: isFrenchFirstCycle()
+      });
 
       if (editMode && editingGradeId) {
         const response = await axios.put(
@@ -484,6 +567,16 @@ const TeacherDashboard = () => {
   };
 
   const handleEditGrade = (grade: Grade) => {
+    // Vérifier si la note est publiée
+    if (grade.is_published) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Impossible de modifier une note publiée. Les notes publiées ne peuvent plus être modifiées.', 
+        severity: 'error' 
+      });
+      return;
+    }
+
     setOpenDialog(true);
     setSelectedStudent(students.find(s => s.id === grade.student_id) || null);
     setEditMode(true);
@@ -507,6 +600,17 @@ const TeacherDashboard = () => {
   };
 
   const handleDeleteGrade = async (id: number) => {
+    // Trouver la note à supprimer pour vérifier si elle est publiée
+    const gradeToDelete = grades.find(g => g.id === id);
+    if (gradeToDelete && gradeToDelete.is_published) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Impossible de supprimer une note publiée. Les notes publiées ne peuvent plus être supprimées.', 
+        severity: 'error' 
+      });
+      return;
+    }
+
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette note ?')) {
       return;
     }
@@ -521,7 +625,7 @@ const TeacherDashboard = () => {
       return;
     }
 
-    // Vérifier si le trimestre est publié
+    // Vérifier si le trimestre est publié (seulement pour empêcher la suppression de notes)
     const selectedTrimesterName = trimesters.find(t => t.id === selectedTrimesterId)?.name;
     if (selectedTrimesterName && publishedTrimesters[selectedTrimesterName]) {
       setSnackbar({ 
@@ -564,6 +668,20 @@ const TeacherDashboard = () => {
     navigate('/login');
   };
 
+  // Fonction utilitaire pour dédupliquer les notes
+  const deduplicateGrades = (grades: any[]) => {
+    const seen = new Set();
+    return grades.filter(grade => {
+      // Créer une clé unique basée sur les propriétés importantes
+      const key = `${grade.student_id}-${grade.grade}-${grade.coefficient}-${grade.sub_subject_name || 'no-sub'}-${grade.semester}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+
   const processedStudents = useMemo(() => {
     if (!students || !Array.isArray(students)) return [];
     if (!grades || !Array.isArray(grades)) return [];
@@ -578,27 +696,100 @@ const TeacherDashboard = () => {
       
       // Filtrer les notes pour le trimestre sélectionné
       const selectedTrimesterName = trimesters.find(t => t.id === selectedTrimesterId)?.name;
-      const studentGrades = grades.filter(
+      const studentGradesRaw = grades.filter(
         g => g && g.student_id === student.id && g.semester === selectedTrimesterName
       );
+      
+      // Dédupliquer les notes
+      const studentGrades = deduplicateGrades(studentGradesRaw);
       
       console.log(`[DEBUG] Notes pour ${student.first_name} ${student.last_name}:`, {
         selectedTrimesterName,
         totalGrades: grades.length,
-        filteredGrades: studentGrades.length,
+        rawFilteredGrades: studentGradesRaw.length,
+        deduplicatedGrades: studentGrades.length,
         grades: studentGrades.map(g => ({
           id: g.id,
           grade: g.grade,
           semester: g.semester,
           is_published: g.is_published,
-          subject_id: g.subject_id
+          subject_id: g.subject_id,
+          sub_subject_name: g.sub_subject_name
         }))
       });
       
       // Calculer la moyenne pour le trimestre sélectionné
-      const totalPoints = studentGrades.reduce((acc, n) => acc + (n.grade || 0) * (n.coefficient || 1), 0);
-      const totalCoefficients = studentGrades.reduce((acc, n) => acc + (n.coefficient || 1), 0);
-      const moyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : null;
+      let moyenne = null;
+      
+      // Vérifier si c'est le français avec des sous-matières
+      const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name?.toLowerCase();
+      const isFrench = selectedSubjectName === 'français' || selectedSubjectName === 'francais';
+      const hasSubSubjects = studentGrades.some((note: any) => note.sub_subject_name);
+      
+      if (isFrench && hasSubSubjects && studentGrades.length > 0) {
+        // Pour le français avec sous-matières : moyenne = moyenne des moyennes des sous-matières
+        const subSubjectAverages: { [key: string]: number } = {};
+        
+        // Grouper les notes par sous-matière
+        const subSubjectGroups: { [key: string]: any[] } = {};
+        studentGrades.forEach((note: any) => {
+          if (note.sub_subject_name && note.grade !== null && note.grade !== undefined) {
+            if (!subSubjectGroups[note.sub_subject_name]) {
+              subSubjectGroups[note.sub_subject_name] = [];
+            }
+            subSubjectGroups[note.sub_subject_name].push(note);
+          }
+        });
+        
+        // Calculer la moyenne de chaque sous-matière
+        Object.keys(subSubjectGroups).forEach(subSubjectName => {
+          const subSubjectNotes = subSubjectGroups[subSubjectName];
+          
+          if (subSubjectNotes.length > 0) {
+            const totalPoints = subSubjectNotes.reduce((sum: number, note: any) => {
+              const grade = parseFloat(note.grade) || 0;
+              const coeff = parseFloat(note.coefficient) || 1;
+              return sum + (grade * coeff);
+            }, 0);
+            
+            const totalCoefficients = subSubjectNotes.reduce((sum: number, note: any) => {
+              return sum + (parseFloat(note.coefficient) || 1);
+            }, 0);
+            
+            subSubjectAverages[subSubjectName] = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+          } else {
+            subSubjectAverages[subSubjectName] = 0;
+          }
+        });
+        
+        // Calculer la moyenne française = moyenne des moyennes des sous-matières
+        const validSubSubjects = Object.values(subSubjectAverages).filter(avg => avg > 0);
+        moyenne = validSubSubjects.length > 0 ? 
+          validSubSubjects.reduce((sum, avg) => sum + avg, 0) / validSubSubjects.length : null;
+        
+        console.log(`📊 Moyenne française calculée (TeacherDashboard):`, {
+          student: `${student.first_name} ${student.last_name}`,
+          subSubjectAverages,
+          frenchAverage: moyenne ? moyenne.toFixed(2) : 'N/A',
+          className: selectedClass?.name,
+          notes: studentGrades.map((n: any) => ({ 
+            sub: n.sub_subject_name, 
+            grade: n.grade, 
+            coeff: n.coefficient 
+          })),
+          calculation: {
+            subSubjectCount: validSubSubjects.length,
+            subSubjectAverages,
+            sum: validSubSubjects.reduce((sum, avg) => sum + avg, 0),
+            average: moyenne
+          }
+        });
+      } else {
+        // Calcul normal pour les autres matières ou français sans sous-matières
+        const totalPoints = studentGrades.reduce((acc, n) => acc + (n.grade || 0) * (n.coefficient || 1), 0);
+        const totalCoefficients = studentGrades.reduce((acc, n) => acc + (n.coefficient || 1), 0);
+        moyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : null;
+      }
       
       const absenceCount = (() => {
         const filtered = classAbsences.filter(a =>
@@ -807,7 +998,7 @@ const TeacherDashboard = () => {
       return;
     }
 
-    // Vérifier si le trimestre est publié
+    // Vérifier si le trimestre est publié (seulement pour empêcher la modification des absences)
     const selectedTrimesterName = selectedTrimesterId ? trimesters.find(t => t.id === selectedTrimesterId)?.name : '';
     if (selectedTrimesterName && publishedTrimesters[selectedTrimesterName]) {
       setSnackbar({ 
@@ -925,6 +1116,35 @@ const TeacherDashboard = () => {
     };
     
     fetchTrimesters();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Charger les sous-matières de français
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchFrenchSubSubjects = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const { data } = await axios.get('https://2ise-groupe.com/api/french-sub-subjects', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (isMounted) {
+          console.log('Sous-matières français chargées:', data);
+          setFrenchSubSubjects(data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Erreur lors du chargement des sous-matières français:', err);
+        }
+      }
+    };
+    
+    fetchFrenchSubSubjects();
     
     return () => {
       isMounted = false;
@@ -1180,6 +1400,13 @@ const TeacherDashboard = () => {
                       {formatHour(row.start_time)} - {formatHour(row.end_time)}
                     </Typography>
                   </Box>
+                  {row.room_name && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#1976d2', fontWeight: 600, fontSize: 12 }}>
+                        📍 {row.room_name}
+                      </Typography>
+                    </Box>
+                  )}
                 </Paper>
               ))}
             </Box>
@@ -1202,7 +1429,8 @@ const TeacherDashboard = () => {
                     <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18 }}>Matière</TableCell>
                     <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18 }}>Jour</TableCell>
                     <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18 }}>Début</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18, borderTopRightRadius: 12 }}>Fin</TableCell>
+                    <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18 }}>Fin</TableCell>
+                    <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: 18, borderTopRightRadius: 12 }}>Salle</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1220,6 +1448,9 @@ const TeacherDashboard = () => {
                       <TableCell sx={{ fontWeight: 600, fontSize: 16 }}>{daysFr[row.day_of_week] || row.day_of_week}</TableCell>
                       <TableCell sx={{ fontWeight: 600, fontSize: 16 }}>{formatHour(row.start_time)}</TableCell>
                       <TableCell sx={{ fontWeight: 600, fontSize: 16 }}>{formatHour(row.end_time)}</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: 16, color: '#1976d2' }}>
+                        {row.room_name ? `📍 ${row.room_name}` : '-'}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1431,9 +1662,20 @@ const TeacherDashboard = () => {
                           }}
                         >
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1976d2', fontSize: 16 }}>
-                              {row.student.first_name} {row.student.last_name}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1976d2', fontSize: 16 }}>
+                                {row.student.first_name} {row.student.last_name}
+                              </Typography>
+                              {areAllStudentGradesPublished(row.student.id) && (
+                                <Chip 
+                                  label="Toutes notes publiées" 
+                                  size="small" 
+                                  color="success" 
+                                  variant="outlined"
+                                  sx={{ fontSize: 10, height: 20 }}
+                                />
+                              )}
+                            </Box>
                             <Typography variant="body2" sx={{ color: '#666', fontWeight: 600 }}>
                               {row.absenceCount > 0 ? `${row.absenceCount} h absences` : 'Aucune absence'}
                             </Typography>
@@ -1489,19 +1731,20 @@ const TeacherDashboard = () => {
                               disabled={isActionDisabled()}
                               onClick={() => handleOpenDialog(row.student)}
                               sx={{
-                                background: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active 
+                                background: isActionDisabled()
                                   ? 'linear-gradient(90deg, #bdbdbd 0%, #9e9e9e 100%)'
                                   : 'linear-gradient(90deg, #1976d2 0%, #43e97b 100%)',
                                 color: 'white',
                                 fontWeight: 700,
                                 borderRadius: 2,
-                                opacity: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active ? 0.5 : 1,
+                                opacity: isActionDisabled() ? 0.5 : 1,
                                 '&:hover': {
-                                  background: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active
+                                  background: isActionDisabled()
                                     ? 'linear-gradient(90deg, #bdbdbd 0%, #9e9e9e 100%)'
                                     : 'linear-gradient(90deg, #1565c0 0%, #21cb7a 100%)',
                                 },
                               }}
+                              title={isActionDisabled() ? getAlertMessage() : ''}
                             >
                               + Note
                             </Button>
@@ -1549,7 +1792,18 @@ const TeacherDashboard = () => {
                               }}
                             >
                               <TableCell sx={{ fontWeight: 600, fontSize: 16 }}>
-                                {row.student.first_name} {row.student.last_name}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <span>{row.student.first_name} {row.student.last_name}</span>
+                                  {areAllStudentGradesPublished(row.student.id) && (
+                                    <Chip 
+                                      label="Toutes notes publiées" 
+                                      size="small" 
+                                      color="success" 
+                                      variant="outlined"
+                                      sx={{ fontSize: 10, height: 20 }}
+                                    />
+                                  )}
+                                </Box>
                               </TableCell>
                               <TableCell>
                                 {row.notes.length > 0 ? (
@@ -1598,7 +1852,7 @@ const TeacherDashboard = () => {
                                   onClick={() => handleOpenDialog(row.student)}
                                   startIcon={<span style={{ fontWeight: 'bold', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</span>}
                                   sx={{
-                                    background: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active 
+                                    background: isActionDisabled()
                                       ? 'linear-gradient(90deg, #bdbdbd 0%, #9e9e9e 100%)'
                                       : 'linear-gradient(90deg, #1976d2 0%, #43e97b 100%)',
                                     color: 'white',
@@ -1611,18 +1865,19 @@ const TeacherDashboard = () => {
                                     fontSize: 15,
                                     letterSpacing: 1,
                                     transition: 'all 0.2s',
-                                    opacity: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active ? 0.5 : 1,
+                                    opacity: isActionDisabled() ? 0.5 : 1,
                                     '&:hover': {
-                                      background: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active
+                                      background: isActionDisabled()
                                         ? 'linear-gradient(90deg, #bdbdbd 0%, #9e9e9e 100%)'
                                         : 'linear-gradient(90deg, #1565c0 0%, #21cb7a 100%)',
                                       boxShadow: '0 4px 16px 0 rgba(33,150,243,0.18)',
-                                      transform: selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active ? 'none' : 'translateY(-2px) scale(1.04)',
+                                      transform: isActionDisabled() ? 'none' : 'translateY(-2px) scale(1.04)',
                                     },
                                     '& .MuiButton-startIcon': {
                                       marginRight: 1.2,
                                     },
                                   }}
+                                  title={isActionDisabled() ? getAlertMessage() : ''}
                                 >
                                   Ajouter une note
                                 </Button>
@@ -1660,17 +1915,42 @@ const TeacherDashboard = () => {
             <Box mb={2}>
               <Typography variant="h6" sx={{ mb: 1, color: 'primary.main', fontWeight: 600 }}>Notes existantes</Typography>
               {studentGradesSnapshot.map((g) => (
-                <Paper key={g.id} sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, bgcolor: '#f0f0f0', borderRadius: 2 }}>
-                  <Typography>
-                    Note: <b>{parseNote(g.grade).toFixed(2)}</b> | Coeff: {g.coefficient} | Semestre: {g.semester}
-                  </Typography>
+                <Paper key={g.id} sx={{ 
+                  p: 1.5, 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  mb: 1, 
+                  bgcolor: g.is_published ? '#e8f5e8' : '#f0f0f0', 
+                  borderRadius: 2,
+                  border: g.is_published ? '2px solid #4caf50' : '1px solid #e0e0e0'
+                }}>
+                  <Box>
+                    <Typography>
+                      Note: <b>{parseNote(g.grade).toFixed(2)}</b> | Coeff: {g.coefficient} | Semestre: {g.semester}
+                    </Typography>
+                    {g.is_published && (
+                      <Chip 
+                        label="PUBLIÉE - Non modifiable" 
+                        size="small" 
+                        color="success" 
+                        variant="filled"
+                        sx={{ mt: 0.5, fontWeight: 600 }}
+                      />
+                    )}
+                  </Box>
                   <Stack direction="row">
                     <Button 
                       size="small" 
                       onClick={() => handleEditGrade(g)} 
                       variant="outlined" 
-                      disabled={isActionDisabled()}
-                      sx={{ mr: 1, opacity: isActionDisabled() ? 0.5 : 1 }}
+                      disabled={isActionDisabled() || g.is_published}
+                      sx={{ 
+                        mr: 1, 
+                        opacity: (isActionDisabled() || g.is_published) ? 0.5 : 1,
+                        color: g.is_published ? '#9e9e9e' : 'inherit'
+                      }}
+                      title={g.is_published ? 'Note publiée - Modification impossible' : ''}
                     >
                       Modifier
                     </Button>
@@ -1679,8 +1959,12 @@ const TeacherDashboard = () => {
                       color="error" 
                       onClick={() => handleDeleteGrade(g.id)} 
                       variant="outlined"
-                      disabled={isActionDisabled()}
-                      sx={{ opacity: isActionDisabled() ? 0.5 : 1 }}
+                      disabled={isActionDisabled() || g.is_published}
+                      sx={{ 
+                        opacity: (isActionDisabled() || g.is_published) ? 0.5 : 1,
+                        color: g.is_published ? '#9e9e9e' : 'inherit'
+                      }}
+                      title={g.is_published ? 'Note publiée - Suppression impossible' : ''}
                     >
                       Supprimer
                     </Button>
@@ -1718,6 +2002,84 @@ const TeacherDashboard = () => {
               ))}
             </Select>
           </FormControl>
+
+          {/* Sélection des sous-matières de français pour le premier cycle UNIQUEMENT */}
+          {(() => {
+            // Vérification stricte : uniquement pour FRANÇAIS et premier cycle (6ème à 3ème)
+            const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name?.toLowerCase();
+            const isFrench = selectedSubjectName === 'français' || selectedSubjectName === 'francais';
+            
+            const className = selectedClass?.name?.toLowerCase() || '';
+            
+            // Premier cycle : 6ème à 3ème
+            const isFirstCycle = className.includes('6ème') || className.includes('5ème') || 
+                                className.includes('4ème') || className.includes('3ème') ||
+                                className.includes('6eme') || className.includes('5eme') || 
+                                className.includes('4eme') || className.includes('3eme') ||
+                                className.includes('6e') || className.includes('5e') || 
+                                className.includes('4e') || className.includes('3e') ||
+                                className.includes('sixième') || className.includes('cinquième') ||
+                                className.includes('quatrième') || className.includes('troisième') ||
+                                className.includes('sixieme') || className.includes('cinquieme') ||
+                                className.includes('quatrieme') || className.includes('troisieme') ||
+                                className.includes('6 éme') || className.includes('5 éme') ||
+                                className.includes('4 éme') || className.includes('3 éme') ||
+                                className.includes('6 eme') || className.includes('5 eme') ||
+                                className.includes('4 eme') || className.includes('3 eme');
+            
+            // Second cycle : 2nde à Terminale (EXPLICITEMENT EXCLUS)
+            const isSecondCycle = className.includes('2nde') || className.includes('1ère') || 
+                                 className.includes('1ere') || className.includes('terminale') ||
+                                 className.includes('seconde') || className.includes('premiere') ||
+                                 className.includes('première');
+            
+            // Ne pas afficher si c'est le second cycle, même si c'est français
+            const shouldShow = isFrench && isFirstCycle && !isSecondCycle && frenchSubSubjects.length > 0;
+            
+            console.log('🎯 DEBUG Affichage sous-matières français:', {
+              selectedSubject,
+              selectedSubjectName,
+              isFrench,
+              className,
+              isFirstCycle,
+              isSecondCycle,
+              frenchSubSubjectsCount: frenchSubSubjects.length,
+              shouldShow,
+              subjects: subjects.map(s => ({ id: s.id, name: s.name })),
+              'DÉTAIL_CLASSE': {
+                'nom_original': selectedClass?.name,
+                'nom_lowercase': className,
+                'contient_premiere': className.includes('premiere'),
+                'contient_première': className.includes('première'),
+                'contient_1ere': className.includes('1ere'),
+                'contient_1ère': className.includes('1ère'),
+                'contient_sixieme': className.includes('sixieme'),
+                'contient_sixième': className.includes('sixième'),
+                'contient_6eme': className.includes('6eme'),
+                'contient_6ème': className.includes('6ème'),
+                'contient_6_eme': className.includes('6 éme'),
+                'contient_6_eme_espace': className.includes('6 eme')
+              }
+            });
+            
+            return shouldShow;
+          })() && (
+            <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+              <InputLabel>Sous-matière de français</InputLabel>
+              <Select
+                value={selectedFrenchSubSubject}
+                label="Sous-matière de français"
+                disabled={isActionDisabled()}
+                onChange={e => setSelectedFrenchSubSubject(Number(e.target.value))}
+              >
+                {frenchSubSubjects.map(subSubject => (
+                  <MenuItem key={`french-sub-${subSubject.id}`} value={subSubject.id}>
+                    {subSubject.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           {selectedTrimesterId && (
             <Typography variant="body2" color="text.secondary">
               {trimesters.find(t => t.id === selectedTrimesterId)?.start_date} - {trimesters.find(t => t.id === selectedTrimesterId)?.end_date}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Drawer,
   List,
@@ -9,7 +9,8 @@ import {
   Box,
   Typography,
   Divider,
-  useTheme
+  useTheme,
+  Collapse
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -30,10 +31,15 @@ import {
   History as HistoryIcon,
   CalendarMonth as CalendarMonthIcon,
   Receipt as ReceiptIcon,
-  TableChart as TableChartIcon
+  TableChart as TableChartIcon,
+  MeetingRoom as MeetingRoomIcon,
+  ExpandLess,
+  ExpandMore,
+  Description as DescriptionIcon,
+  BarChart as BarChartIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { usePermissions } from '../hooks/usePermissions';
+import { usePermissions, Permission } from '../hooks/usePermissions';
 
 const drawerWidth = 250;
 
@@ -41,9 +47,16 @@ const SecretarySidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, hasPermission, getRoleLabel } = usePermissions();
+  const [excelMenuOpen, setExcelMenuOpen] = useState(false);
 
   // Définir les éléments de menu avec leurs permissions
-  const menuItems = [
+  const menuItems: Array<{
+    text: string;
+    icon: React.ReactElement;
+    path: string | null;
+    permission: string;
+    hasSubmenu?: boolean;
+  }> = [
     { 
       text: 'Tableau de bord', 
       icon: <DashboardIcon />, 
@@ -91,6 +104,12 @@ const SecretarySidebar = () => {
       icon: <Assignment />, 
       path: '/secretary/timetables',
       permission: 'canViewTimetables'
+    },
+    { 
+      text: 'Gestion des salles', 
+      icon: <MeetingRoomIcon />, 
+      path: '/secretary/rooms',
+      permission: 'canManageRooms'
     },
     { 
       text: 'Gestion des bulletins', 
@@ -159,20 +178,36 @@ const SecretarySidebar = () => {
       permission: 'canViewHistory'
     },
     { 
+      text: 'Frais Annexes', 
+      icon: <LocalOfferIcon />, 
+      path: '/secretary/annex-fees',
+      permission: 'canManagePayments'
+    },
+    { 
       text: 'Fichier Excel', 
       icon: <TableChartIcon />, 
-      path: '/secretary/excel-files',
-      permission: 'canManageExcelFiles'
+      path: null, // Pas de navigation directe, on gère le menu déroulant
+      permission: 'canManageExcelFiles',
+      hasSubmenu: true
     },
   ];
 
   // Filtrer les éléments de menu selon les permissions
-  const filteredMenuItems = menuItems.filter(item => hasPermission(item.permission as any));
+  const filteredMenuItems = menuItems.filter(item => hasPermission(item.permission as keyof Permission));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
+  };
+
+  const handleExcelMenuToggle = () => {
+    setExcelMenuOpen(!excelMenuOpen);
+  };
+
+  const handleExcelSubmenuClick = (type: 'moyennes' | 'recap') => {
+    // Navigation vers la page ExcelFiles avec un paramètre pour identifier le type
+    navigate(`/secretary/excel-files?type=${type}`);
   };
 
   return (
@@ -208,31 +243,91 @@ const SecretarySidebar = () => {
       <Divider sx={{ bgcolor: 'rgba(255,255,255,0.15)' }} />
       <List sx={{ mt: 2 }}>
         {filteredMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => navigate(item.path)}
-              sx={{
-                borderRadius: 2,
-                mx: 1,
-                '&.Mui-selected': {
-                  bgcolor: 'rgba(255,255,255,0.18)',
-                  color: '#1976d2',
-                  fontWeight: 700,
-                  '& .MuiListItemIcon-root': {
+          <React.Fragment key={item.text}>
+            <ListItem disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  if (item.hasSubmenu) {
+                    handleExcelMenuToggle();
+                  } else if (item.path) {
+                    navigate(item.path);
+                  }
+                }}
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  '&.Mui-selected': {
+                    bgcolor: 'rgba(255,255,255,0.18)',
                     color: '#1976d2',
+                    fontWeight: 700,
+                    '& .MuiListItemIcon-root': {
+                      color: '#1976d2',
+                    },
                   },
-                },
-                '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.10)',
-                },
-                transition: 'all 0.2s',
-              }}
-            >
-              <ListItemIcon sx={{ color: 'white', minWidth: 40, fontSize: 24 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: 500, fontSize: 17 }} />
-            </ListItemButton>
-          </ListItem>
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.10)',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              >
+                <ListItemIcon sx={{ color: 'white', minWidth: 40, fontSize: 24 }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: 500, fontSize: 17 }} />
+                {item.hasSubmenu && (excelMenuOpen ? <ExpandLess /> : <ExpandMore />)}
+              </ListItemButton>
+            </ListItem>
+            
+            {/* Menu déroulant pour Fichier Excel */}
+            {item.hasSubmenu && (
+              <Collapse in={excelMenuOpen} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItemButton
+                    sx={{
+                      pl: 6,
+                      borderRadius: 2,
+                      mx: 1,
+                      mb: 0.5,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.08)',
+                      },
+                      transition: 'all 0.2s',
+                    }}
+                    onClick={() => handleExcelSubmenuClick('moyennes')}
+                  >
+                    <ListItemIcon sx={{ color: 'white', minWidth: 36 }}>
+                      <BarChartIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Exporter les détails des moyennes et rang des élèves" 
+                      primaryTypographyProps={{ fontWeight: 400, fontSize: 15 }}
+                    />
+                  </ListItemButton>
+                  
+                  <ListItemButton
+                    sx={{
+                      pl: 6,
+                      borderRadius: 2,
+                      mx: 1,
+                      mb: 0.5,
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.08)',
+                      },
+                      transition: 'all 0.2s',
+                    }}
+                    onClick={() => handleExcelSubmenuClick('recap')}
+                  >
+                    <ListItemIcon sx={{ color: 'white', minWidth: 36 }}>
+                      <DescriptionIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Exporter le récap des élèves" 
+                      primaryTypographyProps={{ fontWeight: 400, fontSize: 15 }}
+                    />
+                  </ListItemButton>
+                </List>
+              </Collapse>
+            )}
+          </React.Fragment>
         ))}
       </List>
       <Box sx={{ flexGrow: 1 }} />

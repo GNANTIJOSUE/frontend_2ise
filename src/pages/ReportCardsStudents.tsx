@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Box, Container, Typography, Paper, CircularProgress, Alert, Stack, Card, CardContent, Button, FormControl, InputLabel, Select, MenuItem, Alert as MuiAlert, Snackbar, Tabs, Tab, Grid, IconButton } from '@mui/material';
+import { Box, Container, Typography, Paper, CircularProgress, Alert, Stack, Card, CardContent, Button, FormControl, InputLabel, Select, MenuItem, Alert as MuiAlert, Snackbar, Tabs, Tab, Grid, IconButton, Chip } from '@mui/material';
 import SecretarySidebar from '../components/SecretarySidebar';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonIcon from '@mui/icons-material/Person';
@@ -225,19 +225,39 @@ const ReportCardsStudents = () => {
     };
   }, [classId, navigate, schoolYear]);
 
+  // useEffect pour charger les données quand l'étudiant change
   useEffect(() => {
     if (!selectedStudent) return;
-    setTrimestersData(prev => prev.map(t => ({ ...t, loading: true, moyenne: null, matieres: 0, bulletin: [], rang: null, appreciation: '', classStatistics: undefined })));
-    const token = localStorage.getItem('token');
     
-    // Récupérer les données pour chaque trimestre
-    Promise.all(trimesters.map(async (trim) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    // Vérifier si les données sont déjà chargées pour cet étudiant et cette année
+    const studentKey = `${selectedStudent.id}-${schoolYear}`;
+    const isDataLoaded = trimestersData.some(t => t.bulletin.length > 0);
+    
+    if (isDataLoaded) {
+      console.log('✅ Données déjà chargées pour cet étudiant');
+      return;
+    }
+    
+    console.log(`🔄 Chargement initial des données pour l'étudiant ${selectedStudent.id}`);
+    
+    // Marquer tous les trimestres comme en cours de chargement
+    setTrimestersData(prev => prev.map(t => ({ 
+      ...t, 
+      loading: true, 
+      moyenne: null, 
+      matieres: 0, 
+      bulletin: [], 
+      rang: null, 
+      appreciation: '', 
+      classStatistics: undefined 
+    })));
+    
+    // Charger les données pour tous les trimestres
+    const loadTrimesterData = async (trim: string) => {
       try {
-        // Récupérer les notes de l'étudiant
-        const gradesRes = await axios.get(`https://2ise-groupe.com/api/students/${selectedStudent.id}/grades?school_year=${schoolYear}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
         // Normaliser le trimestre pour la correspondance avec la base de données
         let normalizedTrim = trim;
         if (trim === '2e trimestre') {
@@ -246,22 +266,13 @@ const ReportCardsStudents = () => {
           normalizedTrim = '3 ème trimestre';
         }
         
-
-        
-        // Essayer plusieurs variantes de noms de trimestre
-        const possibleTrimesters = [
-          trim,
-          normalizedTrim,
-          '1er trimestre',
-          '1 ème trimestre',
-          '1ème trimestre',
-          'premier trimestre'
-        ];
-        
-        const notesTrim = gradesRes.data.filter((n: any) => {
-          const match = possibleTrimesters.includes(n.semester);
-          return match;
+        // Récupérer les notes de l'étudiant pour le trimestre spécifique
+        const gradesRes = await axios.get(`https://2ise-groupe.com/api/students/${selectedStudent.id}/grades?school_year=${schoolYear}&semester=${encodeURIComponent(normalizedTrim)}`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
+        
+        // L'API retourne déjà les notes filtrées par trimestre
+        const notesTrim = gradesRes.data;
         
         // Calculer la moyenne pondérée avec les coefficients
         const totalCoef = notesTrim.reduce((sum: number, n: any) => sum + (n.coefficient || 1), 0);
@@ -303,51 +314,271 @@ const ReportCardsStudents = () => {
           }
         }
         
-        return {
-          label: trim,
-          moyenne: moy,
-          matieres: notesTrim.length,
-          bulletin: notesTrim,
-          rang: notesTrim[0]?.rang || null,
-          appreciation: notesTrim[0]?.appreciation || '',
-          loading: false,
-          show: false,
-          classStatistics: classStatistics
-        };
+        // Mettre à jour les données du trimestre spécifique
+        setTrimestersData(prev => prev.map(t => {
+          if (t.label === trim) {
+            return {
+              ...t,
+              loading: false,
+              moyenne: moy,
+              matieres: notesTrim.length,
+              bulletin: notesTrim,
+              rang: notesTrim[0]?.rang || null,
+              appreciation: notesTrim[0]?.appreciation || '',
+              classStatistics: classStatistics
+            };
+          }
+          return t;
+        }));
+        
       } catch (error) {
         console.error(`Erreur lors de la récupération des données pour ${trim}:`, error);
-        return {
-          label: trim,
-          moyenne: null,
-          matieres: 0,
-          bulletin: [],
-          rang: null,
-          appreciation: '',
-          loading: false,
-          show: false,
-          classStatistics: {
-            plusForteMoyenne: 'N/A',
-            plusFaibleMoyenne: 'N/A',
-            moyenneClasse: 'N/A'
+        
+        // Mettre à jour avec des données vides en cas d'erreur
+        setTrimestersData(prev => prev.map(t => {
+          if (t.label === trim) {
+            return {
+              ...t,
+              loading: false,
+              moyenne: null,
+              matieres: 0,
+              bulletin: [],
+              rang: null,
+              appreciation: '',
+              classStatistics: {
+                plusForteMoyenne: 'N/A',
+                plusFaibleMoyenne: 'N/A',
+                moyenneClasse: 'N/A'
+              }
+            };
           }
-        };
+          return t;
+        }));
       }
-    })).then(results => {
-      setTrimestersData(results.map((t, i) => ({ 
-        ...trimestersData[i], 
-        ...t, 
-        matieres: Number(t.matieres) || 0, 
-        moyenne: t.moyenne !== undefined ? t.moyenne : null, 
-        bulletin: Array.isArray(t.bulletin) ? t.bulletin : [],
-        classStatistics: t.classStatistics
-      })));
+    };
+    
+    // Charger les données pour tous les trimestres en parallèle
+    trimesters.forEach(trim => {
+      loadTrimesterData(trim);
     });
-  }, [selectedStudent, schoolYear]);
+    
+  }, [selectedStudent?.id, schoolYear]); // ✅ Supprimer trimestersData des dépendances pour éviter la boucle
+
+  // useEffect pour recharger les données quand on change de trimestre
+  useEffect(() => {
+    if (!selectedStudent || !openTrimester) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    // Vérifier si les données pour ce trimestre sont déjà disponibles
+    const currentTrimesterData = trimestersData.find(t => t.label === openTrimester);
+    if (currentTrimesterData && currentTrimesterData.bulletin.length > 0 && !currentTrimesterData.loading) {
+      console.log(`✅ Données déjà disponibles pour le trimestre: ${openTrimester}`);
+      return; // Ne pas recharger si les données sont déjà disponibles
+    }
+    
+    // Marquer le trimestre comme en cours de chargement
+    setTrimestersData(prev => prev.map(t => {
+      if (t.label === openTrimester) {
+        return { ...t, loading: true };
+      }
+      return t;
+    }));
+    
+    // Recharger les données pour le trimestre sélectionné
+    const loadTrimesterData = async () => {
+      try {
+        console.log(`🔄 Rechargement des données pour le trimestre: ${openTrimester}`);
+        
+        // Normaliser le trimestre pour la correspondance avec la base de données
+        let normalizedTrim = openTrimester;
+        if (openTrimester === '2e trimestre') {
+          normalizedTrim = '2 ème trimestre';
+        } else if (openTrimester === '3e trimestre') {
+          normalizedTrim = '3 ème trimestre';
+        }
+        
+        // Récupérer les notes de l'étudiant pour le trimestre spécifique
+        const gradesRes = await axios.get(`https://2ise-groupe.com/api/students/${selectedStudent.id}/grades?school_year=${schoolYear}&semester=${encodeURIComponent(normalizedTrim)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // L'API retourne déjà les notes filtrées par trimestre
+        const trimesterGrades = gradesRes.data;
+        
+        if (trimesterGrades.length === 0) {
+          console.log(`⚠️ Aucune note trouvée pour le trimestre ${openTrimester}`);
+          // Mettre à jour avec des données vides
+          setTrimestersData(prev => prev.map(t => {
+            if (t.label === openTrimester) {
+              return {
+                ...t,
+                loading: false,
+                moyenne: null,
+                matieres: 0,
+                bulletin: [],
+                rang: null,
+                appreciation: '',
+                classStatistics: {
+                  plusForteMoyenne: 'N/A',
+                  plusFaibleMoyenne: 'N/A',
+                  moyenneClasse: 'N/A'
+                }
+              };
+            }
+            return t;
+          }));
+          return;
+        }
+        
+        // Grouper les notes par matière
+        const subjectsMap = new Map();
+        trimesterGrades.forEach((grade: any) => {
+          const key = grade.sub_subject_name ? 
+            `${grade.subject_name} - ${grade.sub_subject_name}` : 
+            grade.subject_name;
+          
+          if (!subjectsMap.has(key)) {
+            subjectsMap.set(key, {
+              subject_name: grade.subject_name,
+              sub_subject_name: grade.sub_subject_name,
+              subject_type: grade.subject_type,
+              coefficient: grade.coefficient || 1,
+              notes: []
+            });
+          }
+          subjectsMap.get(key).notes.push(grade);
+        });
+        
+        // Utiliser les moyennes déjà calculées par l'API
+        const bulletin = Array.from(subjectsMap.values()).map(subject => {
+          // Utiliser la moyenne de l'API si disponible, sinon calculer
+          const moyenne = subject.moyenne !== null && subject.moyenne !== undefined ? 
+            Number(subject.moyenne) : 
+            (() => {
+              const total = subject.notes.reduce((sum: number, note: any) => sum + (note.grade * note.coefficient), 0);
+              const totalCoeff = subject.notes.reduce((sum: number, note: any) => sum + note.coefficient, 0);
+              return totalCoeff > 0 ? total / totalCoeff : 0;
+            })();
+          
+          return {
+            ...subject,
+            moyenne: moyenne,
+            moyCoeff: moyenne * subject.coefficient
+          };
+        });
+        
+        // Calculer la moyenne générale
+        const totalMoyCoeff = bulletin.reduce((sum, subject) => sum + subject.moyCoeff, 0);
+        const totalCoeff = bulletin.reduce((sum, subject) => sum + subject.coefficient, 0);
+        const moyenneGenerale = totalCoeff > 0 ? totalMoyCoeff / totalCoeff : 0;
+        
+        // Récupérer le rang de l'étudiant
+        const rankRes = await axios.get(`https://2ise-groupe.com/api/students/${selectedStudent.id}/trimester-rank?semester=${normalizedTrim}&school_year=${schoolYear}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Récupérer les statistiques de classe
+        const classStatsRes = await axios.get(`https://2ise-groupe.com/api/students/class-statistics?class_id=${selectedStudent.class_id}&semester=${normalizedTrim}&school_year=${schoolYear}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Mettre à jour les données du trimestre
+        setTrimestersData(prev => prev.map(t => {
+          if (t.label === openTrimester) {
+            return {
+              ...t,
+              loading: false,
+              moyenne: moyenneGenerale,
+              matieres: bulletin.length,
+              bulletin: bulletin,
+              rang: rankRes.data?.rank || null,
+              appreciation: moyenneGenerale >= 16 ? 'Excellent' : 
+                           moyenneGenerale >= 14 ? 'Bien' : 
+                           moyenneGenerale >= 12 ? 'Assez bien' : 
+                           moyenneGenerale >= 10 ? 'Passable' : 'Insuffisant',
+              classStatistics: classStatsRes.data
+            };
+          }
+          return t;
+        }));
+        
+        console.log(`✅ Données rechargées pour le trimestre ${openTrimester}:`, {
+          moyenne: moyenneGenerale,
+          matieres: bulletin.length,
+          rang: rankRes.data?.rank
+        });
+        
+      } catch (error) {
+        console.error(`❌ Erreur lors du rechargement des données pour ${openTrimester}:`, error);
+        
+        // Mettre à jour avec des données vides en cas d'erreur
+        setTrimestersData(prev => prev.map(t => {
+          if (t.label === openTrimester) {
+            return {
+              ...t,
+              loading: false,
+              moyenne: null,
+              matieres: 0,
+              bulletin: [],
+              rang: null,
+              appreciation: '',
+              classStatistics: {
+                plusForteMoyenne: 'N/A',
+                plusFaibleMoyenne: 'N/A',
+                moyenneClasse: 'N/A'
+              }
+            };
+          }
+          return t;
+        }));
+      }
+    };
+    
+    loadTrimesterData();
+  }, [openTrimester, selectedStudent?.id, schoolYear]); // ✅ Supprimer trimestersData des dépendances
+
+  // Fonction pour réinitialiser les données des trimestres (déclarée avant utilisation)
+  const resetTrimestersData = useCallback(() => {
+    setTrimestersData([
+      { label: '1er trimestre', color: '#1976d2', icon: '🎓', moyenne: null, matieres: 0, loading: false, bulletin: [], rang: null, appreciation: '', show: false },
+      { label: '2e trimestre', color: '#388e3c', icon: '📈', moyenne: null, matieres: 0, loading: false, bulletin: [], rang: null, appreciation: '', show: false },
+      { label: '3e trimestre', color: '#f57c00', icon: '📊', moyenne: null, matieres: 0, loading: false, bulletin: [], rang: null, appreciation: '', show: false },
+    ]);
+  }, []);
+
+  // useEffect pour réinitialiser les données quand on ferme la sélection d'étudiant
+  useEffect(() => {
+    if (!selectedStudent) {
+      resetTrimestersData();
+      setOpenTrimester(null);
+    }
+  }, [selectedStudent, resetTrimestersData]);
 
   // Quand on change d'année scolaire, on met à jour l'URL (query string)
   const handleSchoolYearChange = (e: any) => {
     setSchoolYear(e.target.value);
     navigate(`/secretary/report-cards/${classId}?school_year=${e.target.value}`);
+    // Réinitialiser les données des trimestres quand on change d'année
+    resetTrimestersData();
+  };
+
+  // Fonction utilitaire pour dédupliquer les notes
+  const deduplicateNotes = (notes: any[]) => {
+    return notes.map(subject => ({
+      ...subject,
+      notes: subject.notes.filter((note: any, index: number, arr: any[]) => {
+        // Garder seulement la première occurrence de chaque note unique
+        return arr.findIndex(n => 
+          n.id === note.id || 
+          (n.sub_subject_name === note.sub_subject_name && 
+           n.grade === note.grade && 
+           n.coefficient === note.coefficient &&
+           n.date === note.date)
+        ) === index;
+      })
+    }));
   };
 
   const handleOpenNotesModal = (student: any) => {
@@ -357,38 +588,416 @@ const ReportCardsStudents = () => {
     fetchStudentNotes(student.id, notesYear);
   };
 
+
   const fetchStudentNotes = async (studentId: number, year: string) => {
     const token = localStorage.getItem('token');
-    const res = await axios.get(
-      `https://2ise-groupe.com/api/students/${studentId}/grades?school_year=${year}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    console.log('Notes récupérées:', res.data);
-    
-    // Organiser les notes par trimestre
-    const notesByTrimester: { [trimester: string]: any[] } = {};
-    trimesters.forEach(trim => {
-      // Normaliser le trimestre pour la correspondance avec la base de données
-      let normalizedTrim = trim;
-      if (trim === '2e trimestre') {
-        normalizedTrim = '2 ème trimestre';
-      } else if (trim === '3e trimestre') {
-        normalizedTrim = '3 ème trimestre';
-      }
+    try {
+      // Récupérer toutes les notes individuelles (publiées et non publiées) directement depuis la table grades
+      const res = await axios.get(
+        `https://2ise-groupe.com/api/students/${studentId}/all-grades?school_year=${year}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      notesByTrimester[trim] = res.data.filter((n: any) => n.semester === trim || n.semester === normalizedTrim);
-      console.log(`Notes pour ${trim}:`, notesByTrimester[trim]);
-    });
-    
-    setAllNotes(notesByTrimester);
-    setNotes(notesByTrimester[notesTrimester] || []);
-    console.log('Notes actuelles:', notesByTrimester[notesTrimester] || []);
+      console.log('Notes individuelles récupérées:', res.data);
+      console.log('Nombre total de notes récupérées:', res.data.length);
+      
+      // Organiser les notes par trimestre
+      const notesByTrimester: { [trimester: string]: any[] } = {};
+      trimesters.forEach(trim => {
+        // Normaliser le trimestre pour la correspondance avec la base de données
+        let normalizedTrim = trim;
+        if (trim === '2e trimestre') {
+          normalizedTrim = '2 ème trimestre';
+        } else if (trim === '3e trimestre') {
+          normalizedTrim = '3 ème trimestre';
+        }
+        
+        // Filtrer les notes pour ce trimestre
+        const trimNotes = res.data.filter((n: any) => {
+          const match = n.semester === trim || n.semester === normalizedTrim;
+          return match;
+        });
+        
+        console.log(`Notes filtrées pour ${trim}:`, trimNotes);
+        console.log(`Nombre de notes pour ${trim}:`, trimNotes.length);
+        
+        // Debug: Afficher les semestres disponibles
+        const availableSemesters = [...new Set(res.data.map((n: any) => n.semester))];
+        console.log('Semestres disponibles dans les données:', availableSemesters);
+        
+        // Grouper les notes par matière
+        const notesBySubject: { [subjectId: number]: any } = {};
+        trimNotes.forEach((note: any) => {
+          const subjectId = note.subject_id;
+          if (!notesBySubject[subjectId]) {
+            notesBySubject[subjectId] = {
+              id: note.id,
+              subject_id: note.subject_id,
+              subject_name: note.subject_name,
+              subject_type: note.subject_type,
+              teacher_name: note.teacher_name,
+              coefficient: note.coefficient || 1,
+              semester: note.semester,
+              academic_year: note.academic_year,
+              moyenne: note.moyenne || note.grade,
+              grade: note.grade,
+              rang: note.rang,
+              appreciation: note.appreciation,
+              is_published: note.is_published,
+              notes: []
+            };
+          }
+          
+          // Vérifier si cette note n'existe pas déjà pour éviter les doublons
+          const existingNote = notesBySubject[subjectId].notes.find((existingNote: any) => 
+            existingNote.id === note.id || 
+            (existingNote.sub_subject_name === note.sub_subject_name && 
+             existingNote.grade === note.grade && 
+             existingNote.coefficient === note.coefficient)
+          );
+          
+          if (!existingNote) {
+            // Ajouter la note individuelle avec toutes les informations
+            notesBySubject[subjectId].notes.push({
+              id: note.id,
+              grade: note.grade,
+              coefficient: note.coefficient || 1,
+              date: note.created_at,
+              sub_subject_name: note.sub_subject_name,
+              class_id: note.class_id,
+              student_id: note.student_id,
+              is_published: note.is_published,
+              subject_id: note.subject_id,
+              semester: note.semester,
+              academic_year: note.academic_year
+            });
+          }
+        });
+        
+        // Recalculer la moyenne pour chaque matière à partir des notes individuelles
+        Object.values(notesBySubject).forEach((subject: any) => {
+          if (subject.notes && subject.notes.length > 0) {
+            // Calculer la moyenne pondérée
+            const totalPoints = subject.notes.reduce((sum: number, note: any) => {
+              const grade = parseFloat(note.grade) || 0;
+              const coeff = parseFloat(note.coefficient) || 1;
+              return sum + (grade * coeff);
+            }, 0);
+            
+            const totalCoefficients = subject.notes.reduce((sum: number, note: any) => {
+              return sum + (parseFloat(note.coefficient) || 1);
+            }, 0);
+            
+            const calculatedMoyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+            subject.moyenne = calculatedMoyenne;
+            
+            console.log(`📊 Moyenne recalculée pour ${subject.subject_name}:`, {
+              notes: subject.notes.map((n: any) => ({ grade: n.grade, coeff: n.coefficient, sub: n.sub_subject_name })),
+              totalPoints,
+              totalCoefficients,
+              calculatedMoyenne: calculatedMoyenne.toFixed(2)
+            });
+          }
+        });
+        
+        // Pour la matière Français, calculer la moyenne des sous-matières
+        Object.values(notesBySubject).forEach((subject: any) => {
+          if (subject.subject_name === 'Français') {
+            // Vérifier si le français a des sous-matières
+            const hasSubSubjects = subject.notes && subject.notes.some((note: any) => note.sub_subject_name);
+            
+            if (hasSubSubjects && subject.notes && subject.notes.length > 0) {
+              // Pour le français avec sous-matières : moyenne = somme des moyennes des sous-matières / nombre de sous-matières
+              const subSubjectAverages: { [key: string]: number } = {};
+              
+              // Grouper les notes par sous-matière et calculer la moyenne de chaque sous-matière
+              const subSubjectGroups: { [key: string]: any[] } = {};
+              subject.notes.forEach((note: any) => {
+                if (note.sub_subject_name && note.grade !== null && note.grade !== undefined) {
+                  if (!subSubjectGroups[note.sub_subject_name]) {
+                    subSubjectGroups[note.sub_subject_name] = [];
+                  }
+                  subSubjectGroups[note.sub_subject_name].push(note);
+                }
+              });
+              
+              // Calculer la moyenne de chaque sous-matière
+              Object.keys(subSubjectGroups).forEach(subSubjectName => {
+                const subSubjectNotes = subSubjectGroups[subSubjectName];
+                
+                if (subSubjectNotes.length > 0) {
+                  const totalPoints = subSubjectNotes.reduce((sum: number, note: any) => {
+                    const grade = parseFloat(note.grade) || 0;
+                    const coeff = parseFloat(note.coefficient) || 1;
+                    return sum + (grade * coeff);
+                  }, 0);
+                  
+                  const totalCoefficients = subSubjectNotes.reduce((sum: number, note: any) => {
+                    return sum + (parseFloat(note.coefficient) || 1);
+                  }, 0);
+                  
+                  subSubjectAverages[subSubjectName] = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                } else {
+                  subSubjectAverages[subSubjectName] = 0;
+                }
+              });
+              
+              // Calculer la moyenne française = moyenne des moyennes des sous-matières
+              const validSubSubjects = Object.values(subSubjectAverages).filter(avg => avg > 0);
+              const frenchAverage = validSubSubjects.length > 0 ? 
+                validSubSubjects.reduce((sum, avg) => sum + avg, 0) / validSubSubjects.length : 0;
+              subject.moyenne = frenchAverage;
+              
+              console.log(`📊 Moyenne française calculée (sous-matières):`, {
+                subSubjectAverages,
+                frenchAverage: frenchAverage.toFixed(2),
+                className: notesStudent?.classe_name,
+                notes: subject.notes.map((n: any) => ({ 
+                  sub: n.sub_subject_name, 
+                  grade: n.grade, 
+                  coeff: n.coefficient 
+                })),
+                calculation: {
+                  subSubjectCount: validSubSubjects.length,
+                  subSubjectAverages,
+                  sum: validSubSubjects.reduce((sum, avg) => sum + avg, 0),
+                  average: frenchAverage
+                }
+              });
+            } else {
+              // Pour le français sans sous-matières, calcul normal
+              const notesWithGrades = subject.notes.filter((note: any) => note.grade !== null && note.grade !== undefined);
+              
+              if (notesWithGrades.length > 0) {
+                const totalPoints = notesWithGrades.reduce((sum: number, note: any) => {
+                  const grade = parseFloat(note.grade) || 0;
+                  const coeff = parseFloat(note.coefficient) || 1;
+                  return sum + (grade * coeff);
+                }, 0);
+                
+                const totalCoefficients = notesWithGrades.reduce((sum: number, note: any) => {
+                  return sum + (parseFloat(note.coefficient) || 1);
+                }, 0);
+                
+                const calculatedMoyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                subject.moyenne = calculatedMoyenne;
+                
+                console.log(`📊 Moyenne française normale calculée:`, {
+                  notesWithGrades: notesWithGrades.map((n: any) => ({ grade: n.grade, coeff: n.coefficient, sub: n.sub_subject_name })),
+                  totalPoints,
+                  totalCoefficients,
+                  calculatedMoyenne: calculatedMoyenne.toFixed(2)
+                });
+              }
+            }
+          }
+        });
+        
+        // Convertir en tableau
+        notesByTrimester[trim] = Object.values(notesBySubject);
+        console.log(`Notes organisées pour ${trim}:`, notesByTrimester[trim]);
+      });
+      
+      // Dédupliquer les notes avant de les stocker
+      const deduplicatedNotesByTrimester: { [trimester: string]: any[] } = {};
+      Object.keys(notesByTrimester).forEach(trim => {
+        deduplicatedNotesByTrimester[trim] = deduplicateNotes(notesByTrimester[trim]);
+      });
+      
+      setAllNotes(deduplicatedNotesByTrimester);
+      setNotes(deduplicatedNotesByTrimester[notesTrimester] || []);
+      console.log('Notes actuelles affichées (dédupliquées):', deduplicatedNotesByTrimester[notesTrimester] || []);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des notes:', error);
+      // Fallback: essayer avec l'API existante
+      try {
+        const fallbackRes = await axios.get(
+          `https://2ise-groupe.com/api/students/${studentId}/grades?school_year=${year}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        console.log('Fallback - Notes récupérées:', fallbackRes.data);
+        
+        // Traiter les données de fallback de la même manière
+        const notesByTrimester: { [trimester: string]: any[] } = {};
+        trimesters.forEach(trim => {
+          let normalizedTrim = trim;
+          if (trim === '2e trimestre') {
+            normalizedTrim = '2 ème trimestre';
+          } else if (trim === '3e trimestre') {
+            normalizedTrim = '3 ème trimestre';
+          }
+          
+          const trimNotes = fallbackRes.data.filter((n: any) => {
+            const match = n.semester === trim || n.semester === normalizedTrim;
+            return match;
+          });
+          
+          const notesBySubject: { [subjectId: number]: any } = {};
+          trimNotes.forEach((note: any) => {
+            const subjectId = note.subject_id;
+            if (!notesBySubject[subjectId]) {
+              notesBySubject[subjectId] = {
+                id: note.id,
+                subject_id: note.subject_id,
+                subject_name: note.subject_name,
+                subject_type: note.subject_type,
+                teacher_name: note.teacher_name,
+                coefficient: note.coefficient || 1,
+                semester: note.semester,
+                academic_year: note.academic_year,
+                moyenne: note.moyenne || note.grade,
+                grade: note.grade,
+                rang: note.rang,
+                appreciation: note.appreciation,
+                is_published: note.is_published,
+                notes: []
+              };
+            }
+            
+            // Vérifier si cette note n'existe pas déjà pour éviter les doublons
+            const existingNote = notesBySubject[subjectId].notes.find((existingNote: any) => 
+              existingNote.id === note.id || 
+              (existingNote.sub_subject_name === note.sub_subject_name && 
+               existingNote.grade === note.grade && 
+               existingNote.coefficient === note.coefficient)
+            );
+            
+            if (!existingNote) {
+              notesBySubject[subjectId].notes.push({
+                id: note.id,
+                grade: note.grade,
+                coefficient: note.coefficient || 1,
+                date: note.created_at,
+                sub_subject_name: note.sub_subject_name,
+                class_id: note.class_id,
+                student_id: note.student_id,
+                is_published: note.is_published,
+                subject_id: note.subject_id,
+                semester: note.semester,
+                academic_year: note.academic_year
+              });
+            }
+          });
+          
+          // Recalculer la moyenne pour chaque matière à partir des notes individuelles (fallback)
+          Object.values(notesBySubject).forEach((subject: any) => {
+            if (subject.notes && subject.notes.length > 0) {
+              if (subject.subject_name === 'Français') {
+                // Vérifier si le français a des sous-matières
+                const hasSubSubjects = subject.notes && subject.notes.some((note: any) => note.sub_subject_name);
+                
+                if (hasSubSubjects) {
+                  // Pour le français avec sous-matières : moyenne = somme des moyennes des sous-matières / nombre de sous-matières
+                  const subSubjectAverages: { [key: string]: number } = {};
+                  
+                  // Grouper les notes par sous-matière et calculer la moyenne de chaque sous-matière
+                  const subSubjectGroups: { [key: string]: any[] } = {};
+                  subject.notes.forEach((note: any) => {
+                    if (note.sub_subject_name && note.grade !== null && note.grade !== undefined) {
+                      if (!subSubjectGroups[note.sub_subject_name]) {
+                        subSubjectGroups[note.sub_subject_name] = [];
+                      }
+                      subSubjectGroups[note.sub_subject_name].push(note);
+                    }
+                  });
+                  
+                  // Calculer la moyenne de chaque sous-matière
+                  Object.keys(subSubjectGroups).forEach(subSubjectName => {
+                    const subSubjectNotes = subSubjectGroups[subSubjectName];
+                    
+                    if (subSubjectNotes.length > 0) {
+                      const totalPoints = subSubjectNotes.reduce((sum: number, note: any) => {
+                        const grade = parseFloat(note.grade) || 0;
+                        const coeff = parseFloat(note.coefficient) || 1;
+                        return sum + (grade * coeff);
+                      }, 0);
+                      
+                      const totalCoefficients = subSubjectNotes.reduce((sum: number, note: any) => {
+                        return sum + (parseFloat(note.coefficient) || 1);
+                      }, 0);
+                      
+                      subSubjectAverages[subSubjectName] = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                    } else {
+                      subSubjectAverages[subSubjectName] = 0;
+                    }
+                  });
+                  
+                  // Calculer la moyenne française = moyenne des moyennes des sous-matières
+                  const validSubSubjects = Object.values(subSubjectAverages).filter(avg => avg > 0);
+                  const frenchAverage = validSubSubjects.length > 0 ? 
+                    validSubSubjects.reduce((sum, avg) => sum + avg, 0) / validSubSubjects.length : 0;
+                  subject.moyenne = frenchAverage;
+                  
+                  console.log(`📊 Moyenne française calculée (sous-matières) (fallback):`, {
+                    subSubjectAverages,
+                    frenchAverage: frenchAverage.toFixed(2),
+                    className: notesStudent?.classe_name,
+                    calculation: {
+                      subSubjectCount: validSubSubjects.length,
+                      subSubjectAverages,
+                      sum: validSubSubjects.reduce((sum, avg) => sum + avg, 0),
+                      average: frenchAverage
+                    }
+                  });
+                } else {
+                  // Pour le français sans sous-matières, calcul normal
+                  const totalPoints = subject.notes.reduce((sum: number, note: any) => {
+                    const grade = parseFloat(note.grade) || 0;
+                    const coeff = parseFloat(note.coefficient) || 1;
+                    return sum + (grade * coeff);
+                  }, 0);
+                  
+                  const totalCoefficients = subject.notes.reduce((sum: number, note: any) => {
+                    return sum + (parseFloat(note.coefficient) || 1);
+                  }, 0);
+                  
+                  const calculatedMoyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                  subject.moyenne = calculatedMoyenne;
+                }
+              } else {
+                // Pour les autres matières, calcul normal
+                const totalPoints = subject.notes.reduce((sum: number, note: any) => {
+                  const grade = parseFloat(note.grade) || 0;
+                  const coeff = parseFloat(note.coefficient) || 1;
+                  return sum + (grade * coeff);
+                }, 0);
+                
+                const totalCoefficients = subject.notes.reduce((sum: number, note: any) => {
+                  return sum + (parseFloat(note.coefficient) || 1);
+                }, 0);
+                
+                const calculatedMoyenne = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                subject.moyenne = calculatedMoyenne;
+              }
+            }
+          });
+          
+          notesByTrimester[trim] = Object.values(notesBySubject);
+        });
+        
+        // Dédupliquer les notes avant de les stocker
+        const deduplicatedNotesByTrimester: { [trimester: string]: any[] } = {};
+        Object.keys(notesByTrimester).forEach(trim => {
+          deduplicatedNotesByTrimester[trim] = deduplicateNotes(notesByTrimester[trim]);
+        });
+        
+        setAllNotes(deduplicatedNotesByTrimester);
+        setNotes(deduplicatedNotesByTrimester[notesTrimester] || []);
+      } catch (fallbackError) {
+        console.error('Erreur lors du fallback:', fallbackError);
+        setSnackbar({ 
+          open: true, 
+          message: 'Erreur lors de la récupération des notes', 
+          severity: 'error' 
+        });
+      }
+    }
   };
 
   const handleEditNote = (note: any) => {
     setEditNote(note);
-    setEditValue(note.moyenne != null ? note.moyenne : note.grade);
+    setEditValue(note.grade || '');
     setEditCoeff(note.coefficient || 1);
   };
 
@@ -417,31 +1026,75 @@ const ReportCardsStudents = () => {
       return;
     }
     
+    // Validation des données
+    const newGrade = parseFloat(editValue);
+    if (isNaN(newGrade) || newGrade < 0 || newGrade > 20) {
+      setSnackbar({ 
+        open: true, 
+        message: 'La note doit être un nombre entre 0 et 20', 
+        severity: 'error' 
+      });
+      return;
+    }
+    
+    if (editCoeff <= 0) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Le coefficient doit être supérieur à 0', 
+        severity: 'error' 
+      });
+      return;
+    }
+    
     setEditLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`https://2ise-groupe.com/api/teachers/grades/${editNote.id}`, {
-        grade: parseFloat(editValue),
-        coefficient: editCoeff,
-        subject_id: editNote.subject_id,
-        class_id: editNote.class_id,
-        semester: editNote.semester,
-        academic_year: notesYear
-      }, { headers: { Authorization: `Bearer ${token}` } });
-      setSnackbar({ open: true, message: 'Note modifiée avec succès', severity: 'success' });
-      if (notesStudent) {
-        fetchStudentNotes(notesStudent.id, notesYear);
+      
+      if (editNote.id) {
+        // Mettre à jour une note existante
+        await axios.put(`https://2ise-groupe.com/api/teachers/grades/${editNote.id}`, {
+          grade: newGrade,
+          coefficient: editCoeff,
+          subject_id: editNote.subject_id,
+          class_id: editNote.class_id,
+          semester: editNote.semester,
+          academic_year: notesYear
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      } else {
+        // Ne pas permettre la création de nouvelles notes
+        setSnackbar({ 
+          open: true, 
+          message: 'Seules les notes existantes peuvent être modifiées', 
+          severity: 'error' 
+        });
+        setEditNote(null);
+        return;
       }
+      
+      setSnackbar({ open: true, message: 'Note modifiée avec succès', severity: 'success' });
+      
+      // Rafraîchir les données
+      if (notesStudent) {
+        await fetchStudentNotes(notesStudent.id, notesYear);
+        // Rafraîchir les données de l'étudiant pour mettre à jour le bulletin
+        await refreshStudentData(notesStudent.id);
+      }
+      
       setEditNote(null);
     } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || 'Erreur lors de la modification', severity: 'error' });
+      console.error('Erreur lors de la modification de la note:', err);
+      setSnackbar({ 
+        open: true, 
+        message: err.response?.data?.message || 'Erreur lors de la modification', 
+        severity: 'error' 
+      });
     } finally {
       setEditLoading(false);
     }
   };
 
   const handleDeleteNote = async (note: any) => {
-    if (!window.confirm('Supprimer cette note ?')) return;
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la note de ${note.subject_name} (${note.moyenne || note.grade}/20) ?`)) return;
     
     // Vérifier si l'année scolaire est fermée
     if (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active) {
@@ -465,13 +1118,27 @@ const ReportCardsStudents = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`https://2ise-groupe.com/api/teachers/grades/${note.id}`, { headers: { Authorization: `Bearer ${token}` } });
-      setSnackbar({ open: true, message: 'Note supprimée', severity: 'success' });
+      
+      // Supprimer la note de la base de données
+      await axios.delete(`https://2ise-groupe.com/api/teachers/grades/${note.id}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      
+      setSnackbar({ open: true, message: 'Note supprimée avec succès', severity: 'success' });
+      
+      // Rafraîchir les données
       if (notesStudent) {
-        fetchStudentNotes(notesStudent.id, notesYear);
+        await fetchStudentNotes(notesStudent.id, notesYear);
+        // Rafraîchir les données de l'étudiant pour mettre à jour le bulletin
+        await refreshStudentData(notesStudent.id);
       }
     } catch (err: any) {
-      setSnackbar({ open: true, message: err.response?.data?.message || 'Erreur lors de la suppression', severity: 'error' });
+      console.error('Erreur lors de la suppression de la note:', err);
+      setSnackbar({ 
+        open: true, 
+        message: err.response?.data?.message || 'Erreur lors de la suppression', 
+        severity: 'error' 
+      });
     }
   };
 
@@ -494,11 +1161,6 @@ const ReportCardsStudents = () => {
         // Charger les données pour chaque trimestre
         for (const trimester of trimesters) {
           try {
-            // Récupérer les notes de l'étudiant
-            const gradesRes = await axios.get(`https://2ise-groupe.com/api/students/${student.id}/grades?school_year=${schoolYear}`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
             // Normaliser le trimestre pour la correspondance avec la base de données
             let normalizedTrim = trimester;
             if (trimester === '2e trimestre') {
@@ -507,28 +1169,19 @@ const ReportCardsStudents = () => {
               normalizedTrim = '3 ème trimestre';
             }
             
+            // Récupérer les notes de l'étudiant pour le trimestre spécifique
+            const gradesRes = await axios.get(`https://2ise-groupe.com/api/students/${student.id}/grades?school_year=${schoolYear}&semester=${encodeURIComponent(normalizedTrim)}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
             
-            
-            // Essayer plusieurs variantes de noms de trimestre
-            const possibleTrimesters = [
-              trimester,
-              normalizedTrim,
-              '1er trimestre',
-              '1 ème trimestre',
-              '1ème trimestre',
-              'premier trimestre'
-            ];
-            
-                                        const notesTrim = gradesRes.data.filter((n: any) => {
-          const match = possibleTrimesters.includes(n.semester);
-          return match;
-        });
+            // L'API retourne déjà les notes filtrées par trimestre
+            const notesTrim = gradesRes.data;
             
             // Calculer la moyenne pondérée avec les coefficients
             const totalCoef = notesTrim.reduce((sum: number, n: any) => sum + (n.coefficient || 1), 0);
             const totalMoyCoef = notesTrim.reduce((sum: number, n: any) => {
-              // Utiliser 'grade' au lieu de 'moyenne' pour correspondre à la base de données
-              const moy = Number(n.grade || n.moyenne);
+              // Utiliser 'moyenne' de l'API (qui est déjà calculée)
+              const moy = Number(n.moyenne);
               const coef = n.coefficient || 1;
               return sum + (isNaN(moy) ? 0 : moy * coef);
             }, 0);
@@ -736,6 +1389,15 @@ const ReportCardsStudents = () => {
                 .font-italic { font-style: italic; }
                 .text-small { font-size: 8px; }
                 
+                /* Styles spécifiques pour la moyenne trimestrielle */
+                .moyenne-trimestrielle {
+                  font-size: 16px !important;
+                  font-weight: 900 !important;
+                  color: #000000 !important;
+                  text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+                  letter-spacing: 0.5px !important;
+                }
+                
                 /* Styles pour l'impression */
                 @media print {
                   body { 
@@ -802,6 +1464,24 @@ const ReportCardsStudents = () => {
                   div[style*="page-break-after: always"] {
                     page-break-after: always !important;
                   }
+                  
+                  /* Styles spécifiques pour la moyenne trimestrielle et le rang lors de l'impression */
+                  .moyenne-trimestrielle,
+                  span[style*="font-size: 16px"] {
+                    font-size: 14px !important;
+                    font-weight: 900 !important;
+                    color: #000000 !important;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+                    letter-spacing: 0.3px !important;
+                  }
+                  
+                  /* Forcer les styles de la moyenne trimestrielle */
+                  td[style*="font-size: 16px"] {
+                    font-size: 14px !important;
+                    font-weight: 900 !important;
+                    color: #000000 !important;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+                  }
                 }
               </style>
             </head>
@@ -864,7 +1544,23 @@ const ReportCardsStudents = () => {
     classStatistics: any,
     principalTeacher: string
   ) => {
-    const formatMoyenne = (moyenne: number | string) => {
+    console.log('🔍 DEBUG generateSingleBulletinHTML - Données reçues:', {
+      studentName: `${student.first_name} ${student.last_name}`,
+      className: student.classe_name,
+      bulletinSubjects: bulletin.map(s => ({ name: s.subject_name, type: s.subject_type })),
+      hasFrenchSubject: bulletin.some(s => s.subject_name === 'Français'),
+      bulletinLength: bulletin.length,
+      bulletinData: bulletin
+    });
+    
+    // Log plus visible pour le débogage
+    console.warn('🚨 FONCTION generateSingleBulletinHTML APPELÉE - Vérifiez la console !');
+    const formatMoyenne = (moyenne: number | string | null | undefined) => {
+      // Gérer les cas null/undefined
+      if (moyenne === null || moyenne === undefined) {
+        return '-';
+      }
+      
       if (typeof moyenne === 'string') {
         // Si c'est déjà une chaîne, vérifier si elle contient une virgule
         if (moyenne.includes(',')) {
@@ -872,7 +1568,7 @@ const ReportCardsStudents = () => {
         }
         // Sinon, convertir en nombre et formater
         const num = parseFloat(moyenne);
-        return isNaN(num) ? '0,00' : num.toFixed(2).replace('.', ',');
+        return isNaN(num) ? '-' : num.toFixed(2).replace('.', ',');
       }
       // Si c'est un nombre
       return moyenne.toFixed(2).replace('.', ',');
@@ -936,9 +1632,104 @@ const ReportCardsStudents = () => {
     
     const individualSubjects = [] as any[];
     
-    // Classer les matières par type
+    // Classer les matières par type et gérer les sous-matières de français
     bulletin.forEach((subject) => {
       const subjectType = subject.subject_type || 'AUTRES';
+      
+      // Vérifier si c'est une sous-matière de français
+      if (subject.is_sub_subject && subject.parent_subject === 'Français') {
+        // Ne pas traiter les sous-matières individuellement, elles seront groupées
+        return;
+      }
+      
+      // Vérifier si c'est la matière principale "Français"
+      if (subject.subject_name === 'Français') {
+        // Vérifier si c'est une classe du premier cycle
+        const className = student.classe_name?.toLowerCase() || '';
+        const isFirstCycle = className.includes('6ème') || className.includes('5ème') || 
+                            className.includes('4ème') || className.includes('3ème') ||
+                            className.includes('6eme') || className.includes('5eme') || 
+                            className.includes('4eme') || className.includes('3eme') ||
+                            className.includes('6e') || className.includes('5e') || 
+                            className.includes('4e') || className.includes('3e') ||
+                            className.includes('sixième') || className.includes('cinquième') ||
+                            className.includes('quatrième') || className.includes('troisième') ||
+                            className.includes('sixieme') || className.includes('cinquieme') ||
+                            className.includes('quatrieme') || className.includes('troisieme') ||
+                            className.includes('6 éme') || className.includes('5 éme') ||
+                            className.includes('4 éme') || className.includes('3 éme') ||
+                            className.includes('6 eme') || className.includes('5 eme') ||
+                            className.includes('4 eme') || className.includes('3 eme');
+        
+        console.log('🔍 DEBUG Français - Classe détectée:', {
+          className: student.classe_name,
+          classNameLower: className,
+          isFirstCycle,
+          subjectName: subject.subject_name
+        });
+        
+        // Log plus visible pour le débogage
+        console.warn('🚨 MATIÈRE FRANÇAIS DÉTECTÉE - Vérifiez la console !', {
+          className: student.classe_name,
+          isFirstCycle
+        });
+        
+        if (isFirstCycle) {
+          // Définir les sous-matières de français disponibles
+          const availableSubSubjects = [
+            { name: 'Grammaire', coefficient: 1 },
+            { name: 'Orthographe', coefficient: 1 },
+            { name: 'Expression écrite', coefficient: 1 }
+          ];
+          
+          // Récupérer les notes existantes pour les sous-matières
+          const existingSubSubjects = subject.notes && Array.isArray(subject.notes) 
+            ? subject.notes.filter((note: any) => note.sub_subject_name)
+            : [];
+          
+          // Créer une entrée spéciale pour le français avec toutes les sous-matières
+          const frenchEntry = {
+            ...subject,
+            subject_name: 'Français',
+            moyenne: subject.moyenne, // Moyenne calculée des sous-matières
+            coefficient: subject.coefficient,
+            sub_subjects: availableSubSubjects.map((subSubject) => {
+              // Chercher si cette sous-matière a des notes
+              const existingNote = existingSubSubjects.find((note: any) => 
+                note.sub_subject_name === subSubject.name
+              );
+              
+              return {
+                name: subSubject.name,
+                moyenne: existingNote ? existingNote.moyenne : null,
+                coefficient: subSubject.coefficient
+              };
+            })
+          };
+          
+          console.log('✅ DEBUG Français - Sous-matières créées:', {
+            subSubjects: frenchEntry.sub_subjects,
+            frenchEntry: frenchEntry
+          });
+          
+          if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
+            subjectsByType[subjectType as keyof typeof subjectsByType].push(frenchEntry);
+          } else {
+            individualSubjects.push(frenchEntry);
+          }
+          return;
+        } else {
+          // Pour les classes du second cycle, afficher le français normalement sans sous-matières
+          console.log('ℹ️ DEBUG Français - Classe du second cycle, affichage normal');
+          if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
+            subjectsByType[subjectType as keyof typeof subjectsByType].push(subject);
+          } else {
+            individualSubjects.push(subject);
+          }
+          return;
+        }
+      }
+      
       if (subjectType === 'LITTERAIRES' || subjectType === 'SCIENTIFIQUES' || subjectType === 'AUTRES') {
         subjectsByType[subjectType as keyof typeof subjectsByType].push(subject);
       } else {
@@ -975,17 +1766,49 @@ const ReportCardsStudents = () => {
     
     // Ajouter d'abord les matières individuelles
     individualSubjects.forEach((subject) => {
-      tableRows += `
-        <tr>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 60px; width: 60px; vertical-align: middle;">${formatMoyenne(subject.moyenne)}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 50px; width: 50px; vertical-align: middle;">${subject.coefficient || 1}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 70px; width: 70px; vertical-align: middle;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 60px; width: 60px; vertical-align: middle;">${formatRang(subject.rang)}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
-          <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
-        </tr>
-      `;
+      // Vérifier si c'est le français avec des sous-matières
+      if (subject.subject_name === 'Français' && subject.sub_subjects && subject.sub_subjects.length > 0) {
+        // Afficher d'abord la ligne principale du français
+        tableRows += `
+          <tr>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.subject_name}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold; min-width: 60px; width: 60px; vertical-align: middle;">${formatMoyenne(subject.moyenne)}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold; min-width: 50px; width: 50px; vertical-align: middle;">${subject.coefficient || 1}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold; min-width: 70px; width: 70px; vertical-align: middle;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold; min-width: 60px; width: 60px; vertical-align: middle;">${formatRang(subject.rang)}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.teacher_name || '-'}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${getAppreciation(subject.moyenne)}</td>
+          </tr>
+        `;
+        
+        // Afficher les sous-matières
+        subject.sub_subjects.forEach((subSubject: any) => {
+          tableRows += `
+            <tr style="background-color: #f9f9f9;">
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px; padding-left: 15px;">• ${subSubject.name}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px; min-width: 60px; width: 60px; vertical-align: middle;">${formatMoyenne(subSubject.moyenne)}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px; min-width: 50px; width: 50px; vertical-align: middle;">${subSubject.coefficient || 1}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px; min-width: 70px; width: 70px; vertical-align: middle;">${formatMoyenne((subSubject.moyenne || 0) * (subSubject.coefficient || 1))}</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px; min-width: 60px; width: 60px; vertical-align: middle;">-</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">-</td>
+              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">${getAppreciation(subSubject.moyenne)}</td>
+            </tr>
+          `;
+        });
+      } else {
+        // Matière normale
+        tableRows += `
+          <tr>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 60px; width: 60px; vertical-align: middle;">${formatMoyenne(subject.moyenne)}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 50px; width: 50px; vertical-align: middle;">${subject.coefficient || 1}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 70px; width: 70px; vertical-align: middle;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 60px; width: 60px; vertical-align: middle;">${formatRang(subject.rang)}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
+            <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
+          </tr>
+        `;
+      }
     });
     
     // Ajouter les matières par type avec leurs bilans
@@ -999,17 +1822,49 @@ const ReportCardsStudents = () => {
       if (subjects.length > 0) {
         // Ajouter les matières du type
         subjects.forEach((subject) => {
-          tableRows += `
-            <tr>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatRang(subject.rang)}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
-              <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
-            </tr>
-          `;
+          // Vérifier si c'est le français avec des sous-matières
+          if (subject.subject_name === 'Français' && subject.sub_subjects && subject.sub_subjects.length > 0) {
+            // Afficher d'abord la ligne principale du français
+            tableRows += `
+              <tr>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.subject_name}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne(subject.moyenne)}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${subject.coefficient || 1}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; font-weight: bold;">${formatRang(subject.rang)}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${subject.teacher_name || '-'}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">${getAppreciation(subject.moyenne)}</td>
+              </tr>
+            `;
+            
+            // Afficher les sous-matières
+            subject.sub_subjects.forEach((subSubject: any) => {
+              tableRows += `
+                <tr style="background-color: #f9f9f9;">
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px; padding-left: 15px;">• ${subSubject.name}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne(subSubject.moyenne)}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${subSubject.coefficient || 1}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">${formatMoyenne((subSubject.moyenne || 0) * (subSubject.coefficient || 1))}</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 7px;">-</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">-</td>
+                  <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 7px;">${getAppreciation(subSubject.moyenne)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            // Matière normale
+            tableRows += `
+              <tr>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.subject_name}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne(subject.moyenne)}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${subject.coefficient || 1}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatMoyenne((subject.moyenne || 0) * (subject.coefficient || 1))}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px;">${formatRang(subject.rang)}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${subject.teacher_name || '-'}</td>
+                <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;">${getAppreciation(subject.moyenne)}</td>
+              </tr>
+            `;
+          }
         });
         
         // Calculer et ajouter le bilan du type
@@ -1055,8 +1910,8 @@ const ReportCardsStudents = () => {
         <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 70px; width: 70px; vertical-align: middle;">${formatMoyenne(totalMoyCoef)}</td>
         <td style="border: 1px solid black; padding: 2px 3px; text-align: center; font-size: 8px; min-width: 60px; width: 60px; vertical-align: middle;"></td>
         <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px;"></td>
-        <td style="border: 1px solid black; padding: 2px 3px; text-align: left; font-size: 8px; font-weight: bold;">
-          MOY. TRIM.: ${allSubjects.length > 0 ? formatMoyenne(moyenneTrimestrielle) : 'N/A'}/20 | RANG: ${formatRang(rangClasse)}
+        <td style="border: 1px solid black !important; padding: 6px 8px !important; text-align: left !important; font-size: 11px !important; font-weight: 900 !important; color: #000 !important; background-color: #f8f8f8 !important;">
+          <span style="font-size: 16px !important; font-weight: 900 !important; color: #000000 !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important; letter-spacing: 0.5px !important;">MOY. TRIM.: ${allSubjects.length > 0 ? formatMoyenne(moyenneTrimestrielle) : 'N/A'}/20</span> | <span style="font-size: 16px !important; font-weight: 900 !important; color: #000000 !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important; letter-spacing: 0.5px !important;">RANG: ${formatRang(rangClasse)}</span>
         </td>
       </tr>
     `;
@@ -1291,10 +2146,41 @@ const ReportCardsStudents = () => {
     `;
   };
 
+  // Fonction pour rafraîchir les données d'un étudiant après modification
+  const refreshStudentData = useCallback(async (studentId: number) => {
+    if (!selectedStudent || selectedStudent.id !== studentId) return;
+    
+    try {
+      // Rafraîchir les données de l'étudiant sélectionné
+      const token = localStorage.getItem('token');
+      const studentDetailsRes = await axios.get(`https://2ise-groupe.com/api/students/${studentId}?school_year=${schoolYear}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const studentWithDetails = {
+        ...studentDetailsRes.data,
+        classe_name: className,
+        principal_teacher_name: selectedStudent.principal_teacher_name
+      };
+      
+      setSelectedStudent(studentWithDetails);
+      
+      // Rafraîchir aussi les données de tous les étudiants pour l'impression en masse
+      if (Object.keys(allStudentsData).length > 0) {
+        await loadAllStudentsData();
+      }
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement des données:', error);
+    }
+  }, [selectedStudent, schoolYear, className, allStudentsData]);
+
   // Fonction pour créer une référence pour un étudiant (maintenant remplacée par getMemoizedBulletinRefCallback)
   const createBulletinRef = useCallback((studentId: number, trimester: string) => {
     return getMemoizedBulletinRefCallback(studentId, trimester);
   }, [getMemoizedBulletinRefCallback]);
+
+  // Mémoriser les données des trimestres pour éviter les re-renders inutiles
+  const memoizedTrimestersData = useMemo(() => trimestersData, [trimestersData]);
 
   console.log('DEBUG publishedTrimesters:', publishedTrimesters);
 
@@ -1678,6 +2564,9 @@ const ReportCardsStudents = () => {
                       },
                     }}
                     onClick={async () => {
+                      // Réinitialiser les données des trimestres avant de sélectionner un nouvel étudiant
+                      resetTrimestersData();
+                      
                       // Récupérer les détails complets de l'étudiant
                       const token = localStorage.getItem('token');
                       try {
@@ -1691,9 +2580,9 @@ const ReportCardsStudents = () => {
                           principal_teacher_name: student.principal_teacher_name
                         };
                         
-                                setSelectedStudent(studentWithDetails);
-      } catch (error) {
-        console.error('[REPORT CARDS] Erreur lors de la récupération des détails:', error);
+                        setSelectedStudent(studentWithDetails);
+                      } catch (error) {
+                        console.error('[REPORT CARDS] Erreur lors de la récupération des détails:', error);
                         // Fallback avec les données de base
                         setSelectedStudent({ ...student, classe_name: className, principal_teacher_name: student.principal_teacher_name });
                       }
@@ -1786,7 +2675,7 @@ const ReportCardsStudents = () => {
                   justifyContent: 'center', 
                   mb: 2 
                 }}>
-                  {trimestersData.map((trim, idx) => (
+                  {memoizedTrimestersData.map((trim, idx) => (
                     <Paper key={trim.label} sx={{ 
                       flex: { xs: '1 1 100%', sm: 1 }, 
                       minWidth: { xs: '100%', sm: 260 }, 
@@ -1823,11 +2712,11 @@ const ReportCardsStudents = () => {
                   <Box sx={{ mt: { xs: 2, sm: 3 }, overflowX: 'auto', width: '100%' }}>
                     <BulletinPDF
                       student={selectedStudent}
-                      bulletin={trimestersData.find(t => t.label === openTrimester)?.bulletin || []}
+                      bulletin={memoizedTrimestersData.find(t => t.label === openTrimester)?.bulletin || []}
                       trimester={openTrimester}
-                      rangClasse={trimestersData.find(t => t.label === openTrimester)?.rang || null}
-                      appreciation={trimestersData.find(t => t.label === openTrimester)?.appreciation || ''}
-                      moyenneClasse={trimestersData.find(t => t.label === openTrimester)?.moyenne || null}
+                      rangClasse={memoizedTrimestersData.find(t => t.label === openTrimester)?.rang || null}
+                      appreciation={memoizedTrimestersData.find(t => t.label === openTrimester)?.appreciation || ''}
+                      moyenneClasse={memoizedTrimestersData.find(t => t.label === openTrimester)?.moyenne || null}
                       schoolYear={schoolYear} // ✅ Ajouter la prop schoolYear manquante
                       trimesterId={(() => {
                         // Déterminer l'ID du trimestre à partir du nom
@@ -1851,7 +2740,7 @@ const ReportCardsStudents = () => {
                       }}
                       principalTeacher={selectedStudent?.principal_teacher_name || 'Non assigné'}
                       compact={true}
-                      classStatistics={trimestersData.find(t => t.label === openTrimester)?.classStatistics}
+                      classStatistics={memoizedTrimestersData.find(t => t.label === openTrimester)?.classStatistics}
                     />
                     <Button variant="outlined" sx={{ mt: 2 }} onClick={() => setOpenTrimester(null)}>
                       Fermer le bulletin
@@ -1861,7 +2750,7 @@ const ReportCardsStudents = () => {
                 {/* Bulletin caché pour impression ciblée */}
                 <div style={{ display: 'none' }}>
                   {openTrimester && (() => {
-                    const trimesterData = trimestersData.find(t => t.label === openTrimester);
+                    const trimesterData = memoizedTrimestersData.find(t => t.label === openTrimester);
                     
                     return (
                       <BulletinPDF
@@ -1933,7 +2822,8 @@ const ReportCardsStudents = () => {
               onChange={(e, newValue) => {
                 setSelectedTab(newValue);
                 setNotesTrimester(trimesters[newValue]);
-                setNotes(allNotes[trimesters[newValue]] || []);
+                const notesForTrimester = allNotes[trimesters[newValue]] || [];
+                setNotes(deduplicateNotes(notesForTrimester));
               }}
               sx={{ mb: 2 }}
             >
@@ -1948,80 +2838,269 @@ const ReportCardsStudents = () => {
             ) : (
               notes.map((matiere, idx) => {
                 console.log('Données de la matière:', matiere);
+                const isEditing = editNote?.id === matiere.id;
+                const isDisabled = publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active);
+                
                 return (
-                <Box key={idx} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight={700}>{matiere.subject_name}</Typography>
-                  {(publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)) && (
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        {publishedTrimesters[notesTrimester] 
-                          ? `⚠️ Le bulletin du ${notesTrimester} est publié. Aucune modification n'est autorisée.`
-                          : `⚠️ L'année scolaire ${schoolYear} est fermée. Aucune modification n'est autorisée.`
-                        }
-                      </Typography>
-                    </Alert>
-                  )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <TextField
-                      type="number"
-                      label="Note"
-                      value={editNote?.id === matiere.id ? editValue : (matiere.moyenne || matiere.grade || matiere.note || '')}
-                      onChange={e => setEditValue(e.target.value)}
-                      disabled={publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)}
-                      sx={{ width: 100 }}
-                      helperText={`Note actuelle: ${matiere.moyenne || matiere.grade || matiere.note || 'Non définie'}`}
-                    />
-                    <TextField
-                      type="number"
-                      label="Coefficient"
-                      value={editNote?.id === matiere.id ? editCoeff : (matiere.coefficient || 1)}
-                      onChange={e => setEditCoeff(Number(e.target.value))}
-                      disabled={publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)}
-                      sx={{ width: 100 }}
-                      helperText={`Coefficient actuel: ${matiere.coefficient || 1}`}
-                    />
-                    {editNote?.id === matiere.id ? (
-                      <>
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          onClick={handleSaveEditNote}
-                          disabled={editLoading}
-                        >
-                          Sauvegarder
-                        </Button>
-                        <Button 
-                          variant="outlined" 
-                          onClick={() => setEditNote(null)}
-                          disabled={editLoading}
-                        >
-                          Annuler
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button 
-                          variant="outlined" 
-                          onClick={() => handleEditNote(matiere)}
-                          disabled={publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)}
-                        >
-                          Modifier
-                        </Button>
-                        <Button 
-                          variant="outlined" 
-                          color="error"
-                          onClick={() => handleDeleteNote(matiere)}
-                          disabled={publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)}
-                        >
-                          Supprimer
-                        </Button>
-                      </>
+                  <Paper key={idx} sx={{ mb: 3, p: 3, borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                    {/* En-tête de la matière */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} color="primary.main">
+                          {matiere.subject_name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Professeur: {matiere.teacher_name || 'Non assigné'} | 
+                          Type: {matiere.subject_type || 'Non défini'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'right' }}>
+                        <Typography variant="h6" fontWeight={700} color="success.main">
+                          Moyenne: {(() => {
+                            // Pour le français avec sous-matières, recalculer la moyenne correctement
+                            if (matiere.subject_name === 'Français' && matiere.notes && matiere.notes.length > 0) {
+                              // Vérifier si le français a des sous-matières
+                              const hasSubSubjects = matiere.notes && matiere.notes.some((note: any) => note.sub_subject_name);
+                              
+                              if (hasSubSubjects) {
+                                // Calculer la moyenne de chaque sous-matière
+                                const subSubjectAverages: { [key: string]: number } = {} as { [key: string]: number };
+                                
+                                // Grouper les notes par sous-matière
+                                const subSubjectGroups: { [key: string]: any[] } = {};
+                                matiere.notes.forEach((note: any) => {
+                                  if (note.sub_subject_name && note.grade !== null && note.grade !== undefined) {
+                                    if (!subSubjectGroups[note.sub_subject_name]) {
+                                      subSubjectGroups[note.sub_subject_name] = [];
+                                    }
+                                    subSubjectGroups[note.sub_subject_name].push(note);
+                                  }
+                                });
+                                
+                                // Calculer la moyenne de chaque sous-matière
+                                Object.keys(subSubjectGroups).forEach(subSubjectName => {
+                                  const subSubjectNotes = subSubjectGroups[subSubjectName];
+                                  
+                                  if (subSubjectNotes.length > 0) {
+                                    const totalPoints = subSubjectNotes.reduce((sum: number, note: any) => {
+                                      const grade = parseFloat(note.grade) || 0;
+                                      const coeff = parseFloat(note.coefficient) || 1;
+                                      return sum + (grade * coeff);
+                                    }, 0);
+                                    
+                                    const totalCoefficients = subSubjectNotes.reduce((sum: number, note: any) => {
+                                      return sum + (parseFloat(note.coefficient) || 1);
+                                    }, 0);
+                                    
+                                    subSubjectAverages[subSubjectName] = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
+                                  } else {
+                                    subSubjectAverages[subSubjectName] = 0;
+                                  }
+                                });
+                                
+                                // Calculer la moyenne française = moyenne des moyennes des sous-matières
+                                const validSubSubjects = Object.values(subSubjectAverages).filter(avg => avg > 0);
+                                const frenchAverage = validSubSubjects.length > 0 ? 
+                                  validSubSubjects.reduce((sum, avg) => sum + avg, 0) / validSubSubjects.length : 0;
+                                
+                                // Debug: Afficher le calcul
+                                console.log('🔍 DEBUG Moyenne française calculée dans l\'interface:', {
+                                  subSubjectAverages,
+                                  frenchAverage: frenchAverage.toFixed(2),
+                                  className: notesStudent?.classe_name,
+                                  notes: matiere.notes.map((n: any) => ({ 
+                                    sub: n.sub_subject_name, 
+                                    grade: n.grade, 
+                                    coeff: n.coefficient 
+                                  })),
+                                  calculation: {
+                                    subSubjectCount: validSubSubjects.length,
+                                    subSubjectAverages,
+                                    sum: validSubSubjects.reduce((sum, avg) => sum + avg, 0),
+                                    average: frenchAverage
+                                  }
+                                });
+                                
+                                return frenchAverage.toFixed(2);
+                              }
+                            }
+                            return matiere.moyenne ? parseFloat(matiere.moyenne).toFixed(2) : 'N/A';
+                          })()}/20
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Coefficient: {matiere.coefficient || 1}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Alerte si publié ou année fermée */}
+                    {(publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active)) && (
+                      <Alert severity="warning" sx={{ mb: 2 }}>
+                        <Typography variant="body2">
+                          {publishedTrimesters[notesTrimester] 
+                            ? `⚠️ Le bulletin du ${notesTrimester} est publié. Aucune modification n'est autorisée.`
+                            : `⚠️ L'année scolaire ${schoolYear} est fermée. Aucune modification n'est autorisée.`
+                          }
+                        </Typography>
+                      </Alert>
                     )}
-                  </Box>
-                </Box>
-              );
-            })
-          )}
+
+                    {/* Tableau des notes individuelles */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 2 }}>
+                        {matiere.subject_name === 'Français' ? 'Sous-matières de français:' : 'Notes individuelles:'}
+                      </Typography>
+                      
+                      {matiere.notes && matiere.notes.length > 0 ? (
+                        <Paper sx={{ overflow: 'hidden' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f5f5f5' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0', fontSize: '14px', fontWeight: 600 }}>
+                                  {matiere.subject_name === 'Français' ? 'Sous-matière' : 'Date'}
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0', fontSize: '14px', fontWeight: 600 }}>
+                                  Note
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0', fontSize: '14px', fontWeight: 600 }}>
+                                  Coefficient
+                                </th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', borderBottom: '1px solid #e0e0e0', fontSize: '14px', fontWeight: 600 }}>
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {matiere.notes.map((note: any, noteIdx: number) => {
+                                const isEditingNote = editNote?.id === note.id;
+                                const isDisabled = publishedTrimesters[notesTrimester] || (selectedSchoolYearStatus && !selectedSchoolYearStatus.is_active);
+                                
+                                // Debug: Log des données de la note
+                                console.log(`[DEBUG] Note ${noteIdx}:`, {
+                                  id: note.id,
+                                  grade: note.grade,
+                                  sub_subject_name: note.sub_subject_name,
+                                  coefficient: note.coefficient,
+                                  is_published: note.is_published
+                                });
+                                
+                                return (
+                                  <tr key={noteIdx} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                                      {note.sub_subject_name || (note.date ? new Date(note.date).toLocaleDateString('fr-FR') : 'Note générale')}
+                                    </td>
+                                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                                      {isEditingNote ? (
+                                        <TextField
+                                          type="number"
+                                          value={editValue}
+                                          onChange={e => setEditValue(e.target.value)}
+                                          disabled={isDisabled}
+                                          size="small"
+                                          sx={{ width: 80 }}
+                                          inputProps={{ min: 0, max: 20, step: 0.1 }}
+                                        />
+                                      ) : (
+                                        <Typography variant="body1" fontWeight={600} color={note.grade && note.grade > 0 ? "primary.main" : "text.secondary"}>
+                                          {note.grade && note.grade > 0 ? `${note.grade}/20` : 'Pas de note'}
+                                        </Typography>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                                      {isEditingNote ? (
+                                        <TextField
+                                          type="number"
+                                          value={editCoeff}
+                                          onChange={e => setEditCoeff(Number(e.target.value))}
+                                          disabled={isDisabled}
+                                          size="small"
+                                          sx={{ width: 80 }}
+                                          inputProps={{ min: 0.1, max: 10, step: 0.1 }}
+                                        />
+                                      ) : (
+                                        <Typography variant="body2">
+                                          {note.coefficient}
+                                        </Typography>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                                      {isEditingNote ? (
+                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                          <Button
+                                            variant="contained"
+                                            color="primary"
+                                            size="small"
+                                            onClick={handleSaveEditNote}
+                                            disabled={editLoading}
+                                            startIcon={editLoading ? <CircularProgress size={14} /> : null}
+                                          >
+                                            {editLoading ? '...' : 'Sauver'}
+                                          </Button>
+                                          <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={() => setEditNote(null)}
+                                            disabled={editLoading}
+                                          >
+                                            Annuler
+                                          </Button>
+                                        </Box>
+                                      ) : (
+                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                          {note.id ? (
+                                            <>
+                                              <Button
+                                                variant="outlined"
+                                                color="primary"
+                                                size="small"
+                                                onClick={() => handleEditNote(note)}
+                                                disabled={isDisabled}
+                                              >
+                                                Modifier
+                                              </Button>
+                                              <Button
+                                                variant="outlined"
+                                                color="error"
+                                                size="small"
+                                                onClick={() => handleDeleteNote(note)}
+                                                disabled={isDisabled}
+                                              >
+                                                Supprimer
+                                              </Button>
+                                            </>
+                                          ) : (
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                              Note non créée
+                                            </Typography>
+                                          )}
+                                        </Box>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </Paper>
+                      ) : (
+                        <Box sx={{ 
+                          p: 2, 
+                          backgroundColor: '#f9f9f9', 
+                          borderRadius: 1,
+                          border: '1px solid #e0e0e0',
+                          textAlign: 'center'
+                        }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Aucune note individuelle disponible pour cette matière
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+
+                  </Paper>
+                );
+              })
+            )}
           </Box>
         </DialogContent>
         <DialogActions>

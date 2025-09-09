@@ -72,6 +72,9 @@ export const API_URLS = {
   // Public
   PUBLIC_HEALTH: `${API_BASE_URL}/public/health`,
   
+  // Rooms
+  ROOMS: `${API_BASE_URL}/rooms`,
+  
   // Assets
   LOGO: `${FRONTEND_BASE_URL}/2ISE.jpg`,
   UPLOADS: `${API_BASE_URL}/uploads`

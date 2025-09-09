@@ -26,6 +26,7 @@ interface ClassDetails {
 }
 interface Subject { id: number; name: string; }
 interface Teacher { id: number; first_name: string; last_name: string; }
+interface Room { id: number; name: string; capacity?: number; room_type: string; }
 interface ScheduleEntry {
   id: number;
   day_of_week: string;
@@ -36,6 +37,8 @@ interface ScheduleEntry {
   teacher_last_name: string;
   subject_id: number;
   teacher_id: number;
+  room_id: number;
+  room_name: string;
 }
 interface ScheduleSlot {
   day: string;
@@ -105,6 +108,7 @@ const ClassTimetablePage = () => {
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -141,6 +145,15 @@ const ClassTimetablePage = () => {
       } catch (err) {
         console.error("Erreur fetch teachers:", err);
         throw new Error("Impossible de charger les professeurs.");
+      }
+      
+      // Fetch rooms
+      try {
+        const roomsRes = await axios.get('https://2ise-groupe.com/api/rooms', { headers: { Authorization: `Bearer ${token}` } });
+        setRooms(roomsRes.data);
+      } catch (err) {
+        console.error("Erreur fetch rooms:", err);
+        throw new Error("Impossible de charger les salles.");
       }
       
     } catch (err: any) {
@@ -250,6 +263,7 @@ const ClassTimetablePage = () => {
       class_id: parseInt(classId!, 10),
       subject_id: selectedSlot.subject_id,
       teacher_id: selectedSlot.teacher_id,
+      room_id: selectedSlot.room_id,
       day_of_week: dayMapping[selectedSlot.day!] || selectedSlot.day,
       start_time: selectedSlot.start_time,
       end_time: selectedSlot.end_time,
@@ -267,6 +281,7 @@ const ClassTimetablePage = () => {
             const newEntry: ScheduleEntry = {
                 subject_id: body.subject_id!,
                 teacher_id: body.teacher_id!,
+                room_id: body.room_id!,
                 start_time: body.start_time!,
                 end_time: body.end_time!,
                 id: response.data.id,
@@ -274,6 +289,7 @@ const ClassTimetablePage = () => {
                 subject_name: subjects.find(s => s.id === body.subject_id)?.name || 'N/A',
                 teacher_first_name: teachers.find(t => t.id === body.teacher_id)?.first_name || 'N/A',
                 teacher_last_name: teachers.find(t => t.id === body.teacher_id)?.last_name || '',
+                room_name: rooms.find(r => r.id === body.room_id)?.name || 'N/A',
             };
             setSchedule(prev => [...prev, newEntry]);
             
@@ -399,6 +415,22 @@ const ClassTimetablePage = () => {
                 }}
             >
                 {entry.teacher_first_name} {entry.teacher_last_name}
+            </Typography>
+            <Typography 
+                variant="caption" 
+                className="room-name"
+                sx={{
+                    color: colors.text, 
+                    opacity: 0.7, 
+                    whiteSpace: 'nowrap', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    mt: 0.25,
+                    fontSize: '0.65rem',
+                    fontWeight: 500
+                }}
+            >
+                📍 {entry.room_name}
             </Typography>
         </Paper>
       );
@@ -560,6 +592,15 @@ const ClassTimetablePage = () => {
                opacity: 1 !important;
                line-height: 1.1 !important;
                visibility: visible !important;
+             }
+             /* Styles pour les noms de salles */
+             .room-name {
+               color: #000 !important;
+               font-size: 7px !important;
+               opacity: 1 !important;
+               line-height: 1.1 !important;
+               visibility: visible !important;
+               font-weight: 500 !important;
              }
              /* Masquer les éléments de navigation */
              .MuiStack-root {
@@ -924,6 +965,22 @@ const ClassTimetablePage = () => {
                                 ))}
                             </Select>
                         </FormControl>
+                        <FormControl fullWidth required>
+                            <InputLabel id="room-select-label">Salle</InputLabel>
+                            <Select
+                                labelId="room-select-label"
+                                value={selectedSlot?.room_id || ''}
+                                label="Salle"
+                                onChange={(e) => setSelectedSlot(prev => ({...prev!, room_id: e.target.value as number}))}
+                                size="small"
+                            >
+                                {rooms.map((r: Room) => (
+                                  <MenuItem key={r.id} value={r.id}>
+                                    {r.name} {r.capacity && `(${r.capacity} places)`}
+                                  </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                         <Stack direction="row" spacing={1} justifyContent="space-between" sx={{pt: 1}}>
                             {selectedSlot?.id && hasPermission('canManageTimetables') && <IconButton onClick={() => handleDelete(selectedSlot.id!)} color="error" size="small"><DeleteIcon /></IconButton>}
                             <Box sx={{ flexGrow: 1 }} />
@@ -933,7 +990,7 @@ const ClassTimetablePage = () => {
                                 type="submit" 
                                 variant="contained" 
                                 size="small" 
-                                disabled={!selectedSlot.subject_id || !selectedSlot.teacher_id}
+                                disabled={!selectedSlot.subject_id || !selectedSlot.teacher_id || !selectedSlot.room_id}
                                 onClick={(e) => handleSave(e)}
                               >
                                 {selectedSlot.id ? 'Mettre à jour' : 'Sauvegarder'}

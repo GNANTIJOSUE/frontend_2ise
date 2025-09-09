@@ -45,6 +45,9 @@ const ScheduleTab = ({ childId, schoolYear }: { childId: string | undefined, sch
       const { data } = await axios.get(`https://2ise-groupe.com/api/students/${childId}/schedule?school_year=${schoolYear}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('🔍 ScheduleTab - Données reçues:', data);
+      console.log('🔍 ScheduleTab - Premier cours:', data.schedule?.[0]);
+      console.log('🔍 ScheduleTab - Salles présentes:', data.schedule?.map((s: any) => s.room_name));
       setSchedule(data.schedule || []);
       setLoading(false);
     };
@@ -161,6 +164,24 @@ const ScheduleTab = ({ childId, schoolYear }: { childId: string | undefined, sch
                         >
                           {grid[i][j].teacher_first_name} {grid[i][j].teacher_last_name}
                         </Typography>
+                        {(() => {
+                          const course = grid[i][j];
+                          console.log('🔍 ScheduleTab - Rendu cours:', { 
+                            subject: course.subject_name, 
+                            room: course.room_name, 
+                            hasRoom: !!course.room_name 
+                          });
+                          
+                          return course.room_name && (
+                            <Typography 
+                              fontSize={isMobile ? 7 : 10} 
+                              color="primary.main"
+                              sx={{ lineHeight: isMobile ? 1.0 : 1.2, fontWeight: 500 }}
+                            >
+                              📍 {course.room_name}
+                            </Typography>
+                          );
+                        })()}
                       </Box>
                     ) : null}
                   </TableCell>

@@ -53,6 +53,8 @@ import SchoolYearsManagement from './pages/secretary/SchoolYearsManagement';
 import History from './pages/secretary/History';
 import PaymentModalities from './pages/secretary/PaymentModalities';
 import ExcelFiles from './pages/secretary/ExcelFiles';
+import RoomsPage from './pages/secretary/RoomsPage';
+import AnnexFees from './pages/secretary/AnnexFees';
 import DOMErrorTest from './components/DOMErrorTest';
 import TestInscriptionStatus from './pages/TestInscriptionStatus';
 import { initDOMErrorPrevention } from './utils/domUtils';
@@ -182,6 +184,8 @@ function AppContent() {
         <Route path="/secretary/history" element={<History />} />
         <Route path="/secretary/payment-modalities" element={<PaymentModalities />} />
         <Route path="/secretary/excel-files" element={<ExcelFiles />} />
+        <Route path="/secretary/rooms" element={<RoomsPage />} />
+        <Route path="/secretary/annex-fees" element={<AnnexFees />} />
         <Route path="/test-dom-errors" element={<DOMErrorTest />} />
         <Route path="/test-inscription-status" element={<TestInscriptionStatus />} />
         <Route path="/teacher/dashboard" element={<TeacherDashboard />} />

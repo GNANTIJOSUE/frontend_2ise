@@ -39,6 +39,7 @@ interface ScheduleEntry {
   teacher_id: number;
   room_id: number;
   room_name: string;
+  coefficient?: number;
 }
 interface ScheduleSlot {
   day: string;
@@ -181,13 +182,20 @@ const ClassTimetablePage = () => {
       try {
         const scheduleRes = await axios.get(`https://2ise-groupe.com/api/schedules/class/${classId}?school_year=${schoolYear}`,
           { headers: { Authorization: `Bearer ${token}` } });
-        const formattedSchedule = scheduleRes.data.map((item: any) => ({
-          ...item,
-          day_of_week: dayMappingReverse[item.day_of_week] || item.day_of_week,
-          subject_name: item.subject_name || 'N/A',
-          teacher_first_name: item.teacher_first_name || 'N/A',
-          teacher_last_name: item.teacher_last_name || '',
-        }));
+        console.log('🔍 Données brutes de l\'API schedules:', scheduleRes.data);
+        const formattedSchedule = scheduleRes.data.map((item: any) => {
+          console.log('🔍 Item brut:', item);
+          console.log('🔍 Coefficient brut:', item.coefficient);
+          return {
+            ...item,
+            day_of_week: dayMappingReverse[item.day_of_week] || item.day_of_week,
+            subject_name: item.subject_name || 'N/A',
+            teacher_first_name: item.teacher_first_name || 'N/A',
+            teacher_last_name: item.teacher_last_name || '',
+            coefficient: item.coefficient || 1,
+          };
+        });
+        console.log('🔍 Schedule formaté:', formattedSchedule);
         setSchedule(formattedSchedule);
       } catch (scheduleErr) {
         console.warn("Avertissement: Impossible de charger l'emploi du temps, la grille sera vide.", scheduleErr);
@@ -203,13 +211,22 @@ const ClassTimetablePage = () => {
     if (!classId) return;
     const token = localStorage.getItem('token');
     if (!token) return;
-    axios.get(`/api/class/${classId}/subjects`, { headers: { Authorization: `Bearer ${token}` } })
+    console.log('🔍 Chargement des coefficients pour la classe:', classId);
+    axios.get(`https://2ise-groupe.com/api/class/${classId}/subjects`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
+        console.log('🔍 Réponse API coefficients:', res.data);
         const coeffs: { [subjectId: number]: number } = {};
-        res.data.forEach((s: any) => { coeffs[s.subject_id] = s.coefficient; });
+        res.data.forEach((s: any) => { 
+          console.log('🔍 Matière:', s.subject_id, 'Coefficient:', s.coefficient);
+          coeffs[s.subject_id] = s.coefficient; 
+        });
+        console.log('🔍 Coefficients finaux:', coeffs);
         setSubjectCoefficients(coeffs);
       })
-      .catch(() => setSubjectCoefficients({}));
+      .catch((err) => {
+        console.error('❌ Erreur lors du chargement des coefficients:', err);
+        setSubjectCoefficients({});
+      });
   }, [classId]);
 
   useEffect(() => {
@@ -231,8 +248,50 @@ const ClassTimetablePage = () => {
   }, [classId, navigate, fetchPrerequisites, fetchTimetable, schoolYear]);
   
   // Handlers
-  const handleSelectSlot = (slot: ScheduleSlot, entry?: ScheduleEntry) => {
-    setSelectedSlot(entry ? { ...entry, ...slot } : slot);
+  const handleSelectSlot = async (slot: ScheduleSlot, entry?: ScheduleEntry) => {
+    if (entry) {
+      // Cours existant - récupérer les détails complets incluant le coefficient
+      console.log('🔍 Cours existant sélectionné:', entry);
+      console.log('🔍 Coefficient du cours:', entry.coefficient);
+      
+      // Récupérer les détails complets du cours
+      const courseDetails = await fetchScheduleEntryDetails(entry.id);
+      let finalCoefficient = 1;
+      
+      if (courseDetails && courseDetails.coefficient) {
+        console.log('🔍 Détails complets récupérés:', courseDetails);
+        console.log('🔍 Coefficient trouvé dans les détails:', courseDetails.coefficient);
+        finalCoefficient = courseDetails.coefficient;
+        const updatedEntry = { ...entry, ...courseDetails };
+        setSelectedSlot({ ...updatedEntry, ...slot });
+      } else {
+        // Fallback: utiliser le coefficient de la classe si disponible
+        console.log('🔍 Pas de coefficient dans les détails, recherche dans subjectCoefficients');
+        console.log('🔍 subjectCoefficients:', subjectCoefficients);
+        console.log('🔍 Coefficient pour subject_id', entry.subject_id, ':', subjectCoefficients[entry.subject_id]);
+        
+        if (subjectCoefficients[entry.subject_id] !== undefined) {
+          finalCoefficient = subjectCoefficients[entry.subject_id];
+          console.log('🔍 Coefficient trouvé dans subjectCoefficients:', finalCoefficient);
+        } else {
+          console.log('🔍 Aucun coefficient trouvé, utilisation de la valeur par défaut: 1');
+          finalCoefficient = 1;
+        }
+        
+        setSelectedSlot({ ...entry, ...slot });
+      }
+      
+      setCoefficient(finalCoefficient);
+      setAutoRetrievedCoefficient(null);
+      setShowAutoRetrievedMessage(false);
+      setShowCoefficientField(false);
+    } else {
+      // Nouveau cours
+      setSelectedSlot(slot);
+      setCoefficient(1);
+      setAutoRetrievedCoefficient(null);
+      setShowAutoRetrievedMessage(false);
+    }
     setIsAddingMode(false);
   };
   
@@ -241,6 +300,8 @@ const ClassTimetablePage = () => {
     setIsAddingMode(false);
     setAutoRetrievedCoefficient(null);
     setShowAutoRetrievedMessage(false);
+    setCoefficient(1);
+    setShowCoefficientField(false);
   };
 
   const handleSave = async (event?: React.MouseEvent<HTMLElement>) => {
@@ -477,6 +538,26 @@ const ClassTimetablePage = () => {
       // Optionnel: afficher une erreur ou ignorer
     }
   }, [setSubjectTeachers]);
+
+  // Fonction pour récupérer les détails d'un cours existant (incluant le coefficient)
+  const fetchScheduleEntryDetails = useCallback(async (scheduleId: number) => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    
+    try {
+      console.log('🔍 Récupération des détails du cours ID:', scheduleId);
+      const { data } = await axios.get(
+        `https://2ise-groupe.com/api/schedules/${scheduleId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log('🔍 Détails du cours récupérés:', data);
+      console.log('🔍 Coefficient dans les détails:', data.coefficient);
+      return data;
+    } catch (err) {
+      console.error('❌ Erreur lors de la récupération des détails du cours:', err);
+      return null;
+    }
+  }, []);
 
   // Fonction pour vérifier les coefficients existants par niveau
   const checkLevelCoefficient = useCallback(async (subjectId: number) => {
@@ -831,12 +912,20 @@ const ClassTimetablePage = () => {
                                     subject_id: subjectId,
                                     teacher_id: undefined // reset prof si matière change
                                   }));
-                                  if (subjectCoefficients[subjectId] !== undefined) {
+                                  
+                                  // Pour les cours existants, ne pas changer le coefficient automatiquement
+                                  if (selectedSlot?.id) {
+                                    // Cours existant - garder le coefficient actuel
                                     setShowCoefficientField(false);
-                                    setCoefficient(subjectCoefficients[subjectId]);
                                   } else {
-                                    setShowCoefficientField(true);
-                                    setCoefficient(1);
+                                    // Nouveau cours - appliquer la logique normale
+                                    if (subjectCoefficients[subjectId] !== undefined) {
+                                      setShowCoefficientField(false);
+                                      setCoefficient(subjectCoefficients[subjectId]);
+                                    } else {
+                                      setShowCoefficientField(true);
+                                      setCoefficient(1);
+                                    }
                                   }
                                 }}
                                 size="small"

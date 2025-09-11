@@ -147,7 +147,6 @@ function AppContent() {
         <Route path="/student/schedule/:studentId" element={<StudentSchedule />} />
         <Route path="/student/choose-trimester" element={<ChooseTrimester />} />
         <Route path="/student/report-card/:trimester" element={<MyReportCard />} />
-        <Route path="/student/report-card" element={<MyReportCard />} />
         <Route path="/student/report-card/:studentId/:classId" element={<StudentReportCard />} />
 
         {/* Routes Secrétaire */}

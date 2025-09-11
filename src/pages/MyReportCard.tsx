@@ -6,7 +6,9 @@ import axios from 'axios';
 import BulletinPDF, { BulletinPDFRef } from './BulletinPDF';
 
 const MyReportCard = () => {
-  const { trimester } = useParams();
+  const { trimester, semester } = useParams();
+  // Gérer les deux noms de paramètres possibles
+  const currentTrimester = trimester || semester;
   const navigate = useNavigate();
   const location = useLocation();
   const [student, setStudent] = useState<any>(null);
@@ -120,7 +122,7 @@ const MyReportCard = () => {
         console.log('DEBUG BULLETIN', { student: studentObj });
         const class_id = studentObj.class_id || studentObj.classe_id || studentObj.classId;
         const currentSchoolYear = studentObj.school_year || schoolYear;
-        console.log('DEBUG AVANT /published', { class_id, currentSchoolYear, trimester });
+        console.log('DEBUG AVANT /published', { class_id, currentSchoolYear, trimester: currentTrimester });
         if (!class_id) {
           setLoading(false);
           setError("Impossible de déterminer la classe de l'élève. Veuillez contacter l'administration.");
@@ -134,14 +136,14 @@ const MyReportCard = () => {
           pubRes = await axios.get('https://2ise-groupe.com/api/report-cards/published', {
             params: {
               class_id,
-              trimester,
+              trimester: currentTrimester,
               school_year: schoolYear
             },
             headers: { Authorization: `Bearer ${token}` }
           });
         } catch (err: any) {
           setLoading(false);
-          setError(`Erreur publication bulletin : ${err?.response?.data?.message || err.message} (class_id=${class_id}, school_year=${schoolYear}, trimester=${trimester})`);
+          setError(`Erreur publication bulletin : ${err?.response?.data?.message || err.message} (class_id=${class_id}, school_year=${schoolYear}, trimester=${currentTrimester})`);
           return;
         }
         if (!isMounted) return;
@@ -165,28 +167,28 @@ const MyReportCard = () => {
           const allGrades = gradesRes.data;
           let filteredGrades;
           
-          if (trimester) {
+          if (currentTrimester) {
             // Normaliser le trimestre pour la correspondance avec la base de données
-            let normalizedTrimester = trimester;
-            if (trimester === '2e trimestre') {
+            let normalizedTrimester = currentTrimester;
+            if (currentTrimester === '2e trimestre') {
               normalizedTrimester = '2 ème trimestre';
-            } else if (trimester === '3e trimestre') {
+            } else if (currentTrimester === '3e trimestre') {
               normalizedTrimester = '3 ème trimestre';
             }
             
             filteredGrades = allGrades.filter((g: any) => 
-              g.semester === trimester || g.semester === normalizedTrimester
+              g.semester === currentTrimester || g.semester === normalizedTrimester
             );
           } else {
             filteredGrades = allGrades;
           }
           
                    // Récupérer les rangs par matière si le trimestre est spécifié
-           if (trimester && filteredGrades.length > 0) {
+           if (currentTrimester && filteredGrades.length > 0) {
              try {
                const ranksRes = await axios.get(`https://2ise-groupe.com/api/students/me/subject-ranks`, {
                  params: {
-                   semester: trimester,
+                   semester: currentTrimester,
                    school_year: schoolYear
                  },
                  headers: { Authorization: `Bearer ${token}` }
@@ -214,10 +216,10 @@ const MyReportCard = () => {
         }
 
         // 5. Récupérer le rang global du trimestre
-        if (typeof trimester === 'string') {
+        if (typeof currentTrimester === 'string') {
           console.log('MyReportCard - Récupération rang global - schoolYear utilisée:', schoolYear);
           const rankRes = await axios.get(
-            `https://2ise-groupe.com/api/students/me/trimester-rank?semester=${encodeURIComponent(trimester)}&school_year=${schoolYear}`,
+            `https://2ise-groupe.com/api/students/me/trimester-rank?semester=${encodeURIComponent(currentTrimester)}&school_year=${schoolYear}`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
                       if (isMounted) {
@@ -233,20 +235,20 @@ const MyReportCard = () => {
         }
 
         // 6. Récupérer les statistiques de classe si la classe existe
-        if (class_id && typeof trimester === 'string') {
+        if (class_id && typeof currentTrimester === 'string') {
           try {
             // Normaliser le trimestre pour les statistiques de classe
-            let normalizedTrimester = trimester;
-            if (trimester === '2e trimestre') {
+            let normalizedTrimester = currentTrimester;
+            if (currentTrimester === '2e trimestre') {
               normalizedTrimester = '2 ème trimestre';
-            } else if (trimester === '3e trimestre') {
+            } else if (currentTrimester === '3e trimestre') {
               normalizedTrimester = '3 ème trimestre';
             }
             
             const statsRes = await axios.get('https://2ise-groupe.com/api/students/class-statistics', {
               params: {
                 class_id,
-                semester: trimester, // Utiliser le trimestre original, le backend gère la normalisation
+                semester: currentTrimester, // Utiliser le trimestre original, le backend gère la normalisation
                 school_year: schoolYear
               },
               headers: { Authorization: `Bearer ${token}` }
@@ -283,7 +285,7 @@ const MyReportCard = () => {
     return () => {
       isMounted = false;
     };
-  }, [navigate, trimester, schoolYear]);
+  }, [navigate, currentTrimester, schoolYear]);
 
   // Les calculs sont maintenant gérés par le composant BulletinPDF
 
@@ -381,13 +383,13 @@ const MyReportCard = () => {
                   ref={bulletinRef}
                   student={student}
                   bulletin={grades}
-                  trimester={trimester || '1er trimestre'}
+                  trimester={currentTrimester || '1er trimestre'}
                   rangClasse={rangClasse}
                   appreciation={appreciation}
                   moyenneClasse={moyenneClasse}
                   trimesterId={(() => {
                     // Déterminer l'ID du trimestre à partir du nom
-                    switch (trimester) {
+                    switch (currentTrimester) {
                       case '1er trimestre':
                         return 1;
                       case '2e trimestre':
@@ -403,7 +405,7 @@ const MyReportCard = () => {
                   compact={true}
                   classStatistics={classStatistics} // Passer les statistiques de classe
                   schoolYear={schoolYear} // Passer l'année scolaire sélectionnée
-                  key={`bulletin-${student?.id}-${schoolYear}-${trimester}`} // Forcer le re-render complet
+                  key={`bulletin-${student?.id}-${schoolYear}-${currentTrimester}`} // Forcer le re-render complet
                 />
               </>
             ) : (
